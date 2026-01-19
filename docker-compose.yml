@@ -1,0 +1,57 @@
+services:
+  # Next.js Full-Stack Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scheduler-app
+    restart: always
+    environment:
+      NODE_ENV: production
+      # Database
+      DATABASE_URL: postgresql://scheduler_user:${DB_PASSWORD:-scheduler_pass}@database:5432/scheduler
+      # Auth.js
+      AUTH_SECRET: ${AUTH_SECRET:-change-this-to-a-random-secret-in-production}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      # SendGrid
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
+      COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
+      # App
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - scheduler-network
+
+  # PostgreSQL Database
+  database:
+    image: postgres:16-alpine
+    container_name: scheduler-database
+    restart: always
+    environment:
+      POSTGRES_DB: scheduler
+      POSTGRES_USER: scheduler_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-scheduler_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scheduler_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scheduler-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  scheduler-network:
+    driver: bridge
