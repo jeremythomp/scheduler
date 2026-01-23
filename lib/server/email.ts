@@ -9,7 +9,7 @@ if (process.env.SENDGRID_API_KEY) {
 }
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@bla.gov.bb'
-const COMPANY_NAME = process.env.COMPANY_NAME || 'Vehicle Inspection Services'
+const COMPANY_NAME = process.env.COMPANY_NAME || 'Barbados Licensing Authority'
 
 // ============================================================================
 // TypeScript Interfaces
@@ -98,7 +98,6 @@ Reference Number: ${request.referenceNumber}
 Scheduled Services:
 - ${servicesList}
 
-Vehicle: ${request.vehicleMake || ''} ${request.vehicleModel || ''} ${request.licensePlate ? '(' + request.licensePlate + ')' : ''}
 
 NEED TO CANCEL?
 If you need to cancel your appointment, click the link below:
@@ -127,8 +126,6 @@ ${COMPANY_NAME}`,
         <ul style="background: #f9fafb; padding: 20px; border-radius: 5px; line-height: 1.8;">
           ${servicesHtml}
         </ul>
-        
-        <p style="color: #6b7280; margin: 15px 0;"><strong>Vehicle:</strong> ${request.vehicleMake || ''} ${request.vehicleModel || ''} ${request.licensePlate ? '(' + request.licensePlate + ')' : ''}</p>
         
         <div style="background: #fef3c7; border: 1px solid #fbbf24; padding: 15px; margin: 25px 0; border-radius: 5px;">
           <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold;">Need to cancel?</p>
@@ -159,8 +156,7 @@ Good news! Your appointment request has been approved.
 Appointment Details:
 - Reference Number: ${request.referenceNumber}
 - Services: ${request.servicesRequested.join(', ')}
-- Vehicle: ${request.vehicleMake || ''} ${request.vehicleModel || ''} ${request.licensePlate ? '(' + request.licensePlate + ')' : ''}
-- Date/Time: ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}
+${request.preferredDate ? `- Date/Time: ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}` : ''}
 
 ${request.staffNotes ? `\nStaff Notes:\n${request.staffNotes}\n` : ''}
 
@@ -178,8 +174,7 @@ ${COMPANY_NAME}`,
       <ul>
         <li><strong>Reference Number:</strong> ${request.referenceNumber}</li>
         <li><strong>Services:</strong> ${request.servicesRequested.join(', ')}</li>
-        <li><strong>Vehicle:</strong> ${request.vehicleMake || ''} ${request.vehicleModel || ''} ${request.licensePlate ? '(' + request.licensePlate + ')' : ''}</li>
-        <li><strong>Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}</li>
+        ${request.preferredDate ? `<li><strong>Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}</li>` : ''}
       </ul>
       ${request.staffNotes ? `<div style="background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;"><strong>Staff Notes:</strong><br/>${request.staffNotes}</div>` : ''}
       <p>Please arrive 10 minutes before your scheduled time.</p>
@@ -201,7 +196,7 @@ We regret to inform you that we are unable to accommodate your appointment reque
 
 Request Details:
 - Reference Number: ${request.referenceNumber}
-- Requested Date/Time: ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}
+${request.preferredDate ? `- Requested Date/Time: ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}` : ''}
 
 ${request.staffNotes ? `\nReason:\n${request.staffNotes}\n` : ''}
 
@@ -217,7 +212,7 @@ ${COMPANY_NAME}`,
       <h3>Request Details:</h3>
       <ul>
         <li><strong>Reference Number:</strong> ${request.referenceNumber}</li>
-        <li><strong>Requested Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}</li>
+        ${request.preferredDate ? `<li><strong>Requested Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString()} at ${request.preferredTime}</li>` : ''}
       </ul>
       ${request.staffNotes ? `<div style="background: #fef2f2; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ef4444;"><strong>Reason:</strong><br/>${request.staffNotes}</div>` : ''}
       <p>Please feel free to submit a new request with alternative dates, or contact us directly to discuss available options.</p>

@@ -51,9 +51,6 @@ export async function POST(request: Request) {
         customerName: appointment.customerName,
         customerEmail: appointment.customerEmail,
         customerPhone: appointment.customerPhone,
-        vehicleType: appointment.vehicleType,
-        vehicleMake: appointment.vehicleMake,
-        vehicleModel: appointment.vehicleModel,
         servicesRequested: appointment.servicesRequested,
         serviceBookings: appointment.serviceBookings.map(booking => ({
           serviceName: booking.serviceName,

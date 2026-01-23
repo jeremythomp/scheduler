@@ -1,11 +1,13 @@
 "use client"
 
-import { CalendarDays, ClipboardList, LayoutDashboard } from "lucide-react"
+import { CalendarDays, ClipboardList, LayoutDashboard, LogOut } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Sheet,
   SheetContent,
@@ -18,6 +20,9 @@ interface MobileNavProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   pendingCount?: number
+  userName?: string
+  userEmail?: string
+  userRole?: string
 }
 
 const navItems = [
@@ -39,8 +44,15 @@ const navItems = [
   },
 ]
 
-export function MobileNav({ open, onOpenChange, pendingCount = 0 }: MobileNavProps) {
+export function MobileNav({ open, onOpenChange, pendingCount = 0, userName, userEmail, userRole }: MobileNavProps) {
   const pathname = usePathname()
+  
+  const initials = userName
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "U"
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -50,7 +62,26 @@ export function MobileNav({ open, onOpenChange, pendingCount = 0 }: MobileNavPro
           <SheetDescription>Access dashboard navigation</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-12 px-2">
+        <div className="mt-12 px-2 space-y-4">
+          {/* User Info */}
+          {(userName || userEmail) && (
+            <Card className="rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm leading-none truncate">{userName || userEmail}</p>
+                  <p className="text-xs text-muted-foreground leading-none mt-1">
+                    {userRole || "Staff"}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Navigation */}
           <Card className="rounded-2xl p-3 shadow-sm">
             <nav className="space-y-1">
@@ -81,6 +112,20 @@ export function MobileNav({ open, onOpenChange, pendingCount = 0 }: MobileNavPro
                 )
               })}
             </nav>
+          </Card>
+
+          {/* Logout */}
+          <Card className="rounded-2xl p-3 shadow-sm">
+            <form action="/api/auth/signout" method="POST" className="w-full">
+              <Button
+                type="submit"
+                variant="ghost"
+                className="w-full justify-start gap-3 px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted rounded-2xl"
+              >
+                <LogOut className="h-5 w-5" />
+                Sign Out
+              </Button>
+            </form>
           </Card>
         </div>
       </SheetContent>

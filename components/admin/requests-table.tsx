@@ -214,9 +214,6 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
                 <TableHead className="px-3 py-4 text-xs font-bold uppercase tracking-wider">
                   Date & Time
                 </TableHead>
-                <TableHead className="px-3 py-4 text-xs font-bold uppercase tracking-wider">
-                  Vehicle
-                </TableHead>
                 <TableHead className="relative py-4 pl-3 pr-6 text-right text-xs font-bold uppercase tracking-wider">
                   Actions
                 </TableHead>
@@ -225,7 +222,7 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
             <TableBody className="divide-y divide-border">
               {filteredRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                     No requests found
                   </TableCell>
                 </TableRow>
@@ -278,14 +275,6 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
                           {request.servicesRequested.length} service{request.servicesRequested.length !== 1 ? 's' : ''} scheduled
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap px-3 py-4 text-sm">
-                      <div className="font-medium">
-                        {request.vehicleMake} {request.vehicleModel || request.vehicleType}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Plate: {request.licensePlate || "N/A"}
-                      </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
                       {request.status === "pending" && (
@@ -370,36 +359,6 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
                   <div>
                     <span className="font-medium">Phone:</span> {selectedRequest.customerPhone}
                   </div>
-                </div>
-              </div>
-
-              {/* Vehicle Info */}
-              <div>
-                <h4 className="font-semibold mb-2">Vehicle Information</h4>
-                <div className="bg-muted p-3 rounded space-y-1 text-sm">
-                  <div>
-                    <span className="font-medium">Type:</span> {selectedRequest.vehicleType}
-                  </div>
-                  {selectedRequest.vehicleMake && (
-                    <div>
-                      <span className="font-medium">Make:</span> {selectedRequest.vehicleMake}
-                    </div>
-                  )}
-                  {selectedRequest.vehicleModel && (
-                    <div>
-                      <span className="font-medium">Model:</span> {selectedRequest.vehicleModel}
-                    </div>
-                  )}
-                  {selectedRequest.licensePlate && (
-                    <div>
-                      <span className="font-medium">License Plate:</span> {selectedRequest.licensePlate}
-                    </div>
-                  )}
-                  {selectedRequest.vin && (
-                    <div>
-                      <span className="font-medium">VIN:</span> {selectedRequest.vin}
-                    </div>
-                  )}
                 </div>
               </div>
 

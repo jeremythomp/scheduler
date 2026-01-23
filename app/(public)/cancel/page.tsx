@@ -20,9 +20,6 @@ interface Appointment {
   referenceNumber: string
   customerName: string
   customerEmail: string
-  vehicleType: string
-  vehicleMake?: string
-  vehicleModel?: string
   servicesRequested: string[]
   serviceBookings: ServiceBooking[]
   status: string
@@ -210,15 +207,6 @@ export default function CancelPage() {
               <div>
                 <div className="text-sm font-medium text-muted-foreground">Email</div>
                 <div className="text-base">{appointment.customerEmail}</div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="text-sm font-medium text-muted-foreground mb-2">Vehicle</div>
-              <div className="text-base">
-                {appointment.vehicleType}
-                {appointment.vehicleMake && ` - ${appointment.vehicleMake}`}
-                {appointment.vehicleModel && ` ${appointment.vehicleModel}`}
               </div>
             </div>
             

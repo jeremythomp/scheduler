@@ -199,11 +199,6 @@ export async function getServiceBookings(filters?: {
             customerName: true,
             customerEmail: true,
             customerPhone: true,
-            vehicleType: true,
-            vehicleMake: true,
-            vehicleModel: true,
-            licensePlate: true,
-            vin: true,
             additionalNotes: true,
             status: true,
             createdAt: true
@@ -218,8 +213,7 @@ export async function getServiceBookings(filters?: {
       return bookings.filter(booking => 
         booking.appointmentRequest.customerName.toLowerCase().includes(searchLower) ||
         booking.appointmentRequest.referenceNumber.toLowerCase().includes(searchLower) ||
-        (booking.appointmentRequest.customerEmail?.toLowerCase().includes(searchLower)) ||
-        (booking.appointmentRequest.licensePlate?.toLowerCase().includes(searchLower))
+        (booking.appointmentRequest.customerEmail?.toLowerCase().includes(searchLower))
       )
     }
     

@@ -111,6 +111,9 @@ export function AdminHeader({ userName, userEmail, userRole, pendingCount, today
         open={mobileNavOpen}
         onOpenChange={setMobileNavOpen}
         pendingCount={pendingCount}
+        userName={userName}
+        userEmail={userEmail}
+        userRole={userRole}
       />
     </header>
   )

@@ -22,7 +22,6 @@ type ServiceBookingWithRequest = ServiceBooking & {
   appointmentRequest: Pick<
     AppointmentRequest,
     'id' | 'referenceNumber' | 'customerName' | 'customerEmail' | 'customerPhone' | 
-    'vehicleType' | 'vehicleMake' | 'vehicleModel' | 'licensePlate' | 'vin' | 
     'additionalNotes' | 'status' | 'createdAt'
   >
 }
@@ -86,8 +85,7 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
       const query = searchQuery.toLowerCase()
       result = result.filter(booking =>
         booking.appointmentRequest.customerName.toLowerCase().includes(query) ||
-        booking.appointmentRequest.referenceNumber.toLowerCase().includes(query) ||
-        (booking.appointmentRequest.licensePlate?.toLowerCase().includes(query))
+        booking.appointmentRequest.referenceNumber.toLowerCase().includes(query)
       )
     }
 
@@ -190,7 +188,6 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
                     <SortIcon field="service" />
                   </button>
                 </TableHead>
-                <TableHead>Vehicle</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -198,7 +195,7 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
             <TableBody>
               {currentBookings.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     No appointments found
                   </TableCell>
                 </TableRow>
@@ -240,19 +237,6 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
                       <Badge className={cn("ring-1 ring-inset", serviceColors[booking.serviceName] || "")}>
                         {booking.serviceName.replace("Vehicle ", "")}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {booking.appointmentRequest.vehicleMake || booking.appointmentRequest.vehicleType}
-                          {booking.appointmentRequest.vehicleModel && ` ${booking.appointmentRequest.vehicleModel}`}
-                        </div>
-                        {booking.appointmentRequest.licensePlate && (
-                          <div className="text-sm text-muted-foreground font-mono">
-                            {booking.appointmentRequest.licensePlate}
-                          </div>
-                        )}
-                      </div>
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-sm">

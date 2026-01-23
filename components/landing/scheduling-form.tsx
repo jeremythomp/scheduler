@@ -71,7 +71,7 @@ export function SchedulingForm() {
             <Label className="block text-sm font-bold pl-1">
               Select Services *
             </Label>
-            <div className="grid grid-cols-1 gap-2">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
               {serviceOptions.map((service) => {
                 const isSelected = selectedServices.includes(service.value)
                 const Icon = service.icon
@@ -82,7 +82,7 @@ export function SchedulingForm() {
                     type="button"
                     variant={isSelected ? "default" : "outline"}
                     onClick={() => toggleService(service.value)}
-                    className={`w-full rounded-2xl py-6 text-sm font-bold transition-all flex items-center justify-start gap-3 relative ${
+                    className={`w-full sm:w-auto sm:flex-1 rounded-2xl py-6 text-sm font-bold transition-all flex items-center justify-start gap-3 relative ${
                       isSelected ? "ring-2 ring-primary" : "hover:bg-muted"
                     }`}
                   >

@@ -64,6 +64,30 @@ const generateTimeSlots = (serviceType: ServiceType): string[] => {
   }
 }
 
+// Helper function to check if a time slot is in the past
+const isTimeSlotInPast = (date: Date, timeString: string): boolean => {
+  const now = new Date()
+  
+  // Parse the time string (e.g., "08:30 AM")
+  const [time, period] = timeString.split(' ')
+  const [hours, minutes] = time.split(':').map(Number)
+  
+  // Convert to 24-hour format
+  let hour24 = hours
+  if (period === 'PM' && hours !== 12) {
+    hour24 = hours + 12
+  } else if (period === 'AM' && hours === 12) {
+    hour24 = 0
+  }
+  
+  // Create a date object for the slot time
+  const slotTime = new Date(date)
+  slotTime.setHours(hour24, minutes, 0, 0)
+  
+  // Check if the slot time is in the past
+  return slotTime < now
+}
+
 // Generate weekly schedule with real dates
 const generateWeekSchedule = (
   serviceType: ServiceType, 
@@ -112,18 +136,29 @@ const generateWeekSchedule = (
       .filter(slot => slot.date === dateString)
       .map(slot => slot.time)
     
-    // Check if day is fully booked
-    const availableSlots = baseSlots.filter(time => !bookedTimes.includes(time))
-    const isFullyBooked = !isPast && !isWeekend && availableSlots.length === 0
+    // Check if day is fully booked (only considering future slots)
+    // Don't count past time slots as part of "fully booked" calculation
+    const futureSlots = baseSlots.filter(time => {
+      if (isPast) return false // Entire day is in the past
+      if (isToday) return !isTimeSlotInPast(dayDate, time) // Only future times today
+      return true // All slots are future
+    })
+    const availableFutureSlots = futureSlots.filter(time => !bookedTimes.includes(time))
+    const isFullyBooked = !isPast && !isWeekend && futureSlots.length > 0 && availableFutureSlots.length === 0
     
     weekSchedule.push({
       day: days[i],
       date,
-      slots: baseSlots.map((time) => ({
-        time,
-        available: !isPast && !isWeekend,
-        booked: bookedTimes.includes(time),
-      })),
+      slots: baseSlots.map((time) => {
+        // Check if this specific time slot is in the past
+        const isSlotInPast = isPast || (isToday && isTimeSlotInPast(dayDate, time))
+        
+        return {
+          time,
+          available: !isSlotInPast && !isWeekend,
+          booked: bookedTimes.includes(time),
+        }
+      }),
       weekend: isWeekend,
       fullyBooked: isFullyBooked,
       isToday,

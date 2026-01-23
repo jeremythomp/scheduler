@@ -22,11 +22,21 @@ type ServiceBookingWithRequest = ServiceBooking & {
 
 interface AppointmentsViewProps {
   initialBookings: ServiceBookingWithRequest[]
+  serviceFilter?: string
+  onServiceFilterChange?: (value: string) => void
 }
 
-export function AppointmentsView({ initialBookings }: AppointmentsViewProps) {
+export function AppointmentsView({ 
+  initialBookings, 
+  serviceFilter: controlledServiceFilter,
+  onServiceFilterChange 
+}: AppointmentsViewProps) {
   const [viewMode, setViewMode] = useState<"calendar" | "table">("calendar")
-  const [serviceFilter, setServiceFilter] = useState("all")
+  const [internalServiceFilter, setInternalServiceFilter] = useState("all")
+  
+  // Use controlled or uncontrolled mode
+  const serviceFilter = controlledServiceFilter ?? internalServiceFilter
+  const setServiceFilter = onServiceFilterChange ?? setInternalServiceFilter
   const [selectedBooking, setSelectedBooking] = useState<ServiceBookingWithRequest | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [dayBookings, setDayBookings] = useState<ServiceBookingWithRequest[]>([])

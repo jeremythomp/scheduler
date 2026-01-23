@@ -15,11 +15,6 @@ export interface AppointmentRequest {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  vehicleType: string;
-  vehicleMake: string;
-  vehicleModel: string;
-  licensePlate: string;
-  vin?: string;
   servicesRequested: string[];
   preferredDate?: string;
   preferredTime?: string;

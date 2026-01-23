@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
-import { X, User, Mail, Phone, Car, Calendar, Clock, FileText, Hash, ChevronRight } from "lucide-react"
+import { X, User, Mail, Phone, Calendar, Clock, FileText, Hash, ChevronRight } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,6 @@ type ServiceBookingWithRequest = ServiceBooking & {
   appointmentRequest: Pick<
     AppointmentRequest,
     'id' | 'referenceNumber' | 'customerName' | 'customerEmail' | 'customerPhone' | 
-    'vehicleType' | 'vehicleMake' | 'vehicleModel' | 'licensePlate' | 'vin' | 
     'additionalNotes' | 'status' | 'createdAt'
   >
 }
@@ -223,55 +222,6 @@ export function AppointmentDetailsSidebar({
                     <p className="text-sm font-medium">{formatTime(displayBooking.scheduledTime)}</p>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Vehicle Info */}
-            <div className="space-y-3">
-              <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
-                Vehicle
-              </h4>
-              <div className="space-y-3 bg-muted/50 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Car className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground">Type</p>
-                    <p className="text-sm font-medium">{displayBooking.appointmentRequest.vehicleType}</p>
-                  </div>
-                </div>
-
-                {displayBooking.appointmentRequest.vehicleMake && (
-                  <div className="flex items-start gap-3">
-                    <div className="h-4 w-4 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">Make & Model</p>
-                      <p className="text-sm font-medium">
-                        {displayBooking.appointmentRequest.vehicleMake}
-                        {displayBooking.appointmentRequest.vehicleModel && ` ${displayBooking.appointmentRequest.vehicleModel}`}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {displayBooking.appointmentRequest.licensePlate && (
-                  <div className="flex items-start gap-3">
-                    <div className="h-4 w-4 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">License Plate</p>
-                      <p className="text-sm font-medium font-mono">{displayBooking.appointmentRequest.licensePlate}</p>
-                    </div>
-                  </div>
-                )}
-
-                {displayBooking.appointmentRequest.vin && (
-                  <div className="flex items-start gap-3">
-                    <div className="h-4 w-4 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">VIN</p>
-                      <p className="text-sm font-medium font-mono">{displayBooking.appointmentRequest.vin}</p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

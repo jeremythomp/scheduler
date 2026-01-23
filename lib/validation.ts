@@ -14,11 +14,6 @@ export const appointmentRequestSchema = z.object({
   customerName: z.string().min(2, "Name must be at least 2 characters"),
   customerEmail: z.string().email("Invalid email address"),
   customerPhone: z.string().optional().default(""),
-  vehicleType: z.string().min(1, "Vehicle type is required"),
-  vehicleMake: z.string().optional(),
-  vehicleModel: z.string().optional(),
-  licensePlate: z.string().optional(),
-  vin: z.string().optional(),
   servicesRequested: z.array(z.string()).min(1, "At least one service must be selected"),
   serviceBookings: z.array(serviceBookingSchema).min(1, "At least one service booking is required"),
   additionalNotes: z.string().optional()

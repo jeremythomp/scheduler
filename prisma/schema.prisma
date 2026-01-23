@@ -31,11 +31,6 @@ model AppointmentRequest {
   customerName        String
   customerEmail       String
   customerPhone       String?
-  vehicleType         String
-  vehicleMake         String?
-  vehicleModel        String?
-  licensePlate        String?
-  vin                 String?
   servicesRequested   String[]
   preferredDate       DateTime?
   preferredTime       String?

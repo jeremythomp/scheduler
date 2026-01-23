@@ -112,7 +112,6 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                 <TableRow>
                   <TableHead>Reference</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Vehicle</TableHead>
                   <TableHead>Services</TableHead>
                   <TableHead>Preferred Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -122,7 +121,7 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
               <TableBody>
                 {filteredRequests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
                       No requests found
                     </TableCell>
                   </TableRow>
@@ -134,16 +133,6 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                         <div>
                           <div className="font-medium">{request.customerName}</div>
                           <div className="text-sm text-gray-500">{request.customerPhone}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{request.vehicleType}</div>
-                          {(request.vehicleMake || request.vehicleModel) && (
-                            <div className="text-gray-500">
-                              {request.vehicleMake} {request.vehicleModel}
-                            </div>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -189,18 +178,6 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                                     <div><span className="font-medium">Name:</span> {request.customerName}</div>
                                     <div><span className="font-medium">Email:</span> {request.customerEmail}</div>
                                     <div><span className="font-medium">Phone:</span> {request.customerPhone}</div>
-                                  </div>
-                                </div>
-
-                                {/* Vehicle Info */}
-                                <div>
-                                  <h4 className="font-semibold mb-2">Vehicle Information</h4>
-                                  <div className="bg-gray-50 p-3 rounded space-y-1 text-sm">
-                                    <div><span className="font-medium">Type:</span> {request.vehicleType}</div>
-                                    {request.vehicleMake && <div><span className="font-medium">Make:</span> {request.vehicleMake}</div>}
-                                    {request.vehicleModel && <div><span className="font-medium">Model:</span> {request.vehicleModel}</div>}
-                                    {request.licensePlate && <div><span className="font-medium">License Plate:</span> {request.licensePlate}</div>}
-                                    {request.vin && <div><span className="font-medium">VIN:</span> {request.vin}</div>}
                                   </div>
                                 </div>
 
