@@ -40,6 +40,7 @@ export async function POST(request: Request) {
                 serviceName: booking.serviceName,
                 scheduledDate: new Date(booking.scheduledDate),
                 scheduledTime: booking.scheduledTime,
+                location: booking.location,
               }
             })
           )

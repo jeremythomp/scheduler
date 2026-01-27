@@ -12,7 +12,6 @@ type ServiceBookingWithRequest = ServiceBooking & {
   appointmentRequest: Pick<
     AppointmentRequest,
     'id' | 'referenceNumber' | 'customerName' | 'customerEmail' | 'customerPhone' | 
-    'vehicleType' | 'vehicleMake' | 'vehicleModel' | 'licensePlate' | 'vin' | 
     'additionalNotes' | 'status' | 'createdAt'
   >
 }
@@ -33,7 +32,7 @@ interface CalendarDay {
 const serviceColors: Record<string, string> = {
   "Vehicle Inspection": "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-700",
   "Vehicle Weighing": "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
-  "Vehicle Registration": "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700"
+  "Vehicle Registration/Customer Service Center": "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700"
 }
 
 export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalendarProps) {
@@ -178,7 +177,7 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
                         "h-2 w-2 rounded-full",
                         serviceName === "Vehicle Inspection" && "bg-orange-500",
                         serviceName === "Vehicle Weighing" && "bg-gray-500",
-                        serviceName === "Vehicle Registration" && "bg-blue-500"
+                        serviceName === "Vehicle Registration/Customer Service Center" && "bg-blue-500"
                       )}
                       title={serviceName}
                     />

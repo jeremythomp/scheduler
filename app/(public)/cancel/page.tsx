@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,7 +26,7 @@ interface Appointment {
   status: string
 }
 
-export default function CancelPage() {
+function CancelPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get("token")
@@ -283,5 +284,13 @@ export default function CancelPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function CancelPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <CancelPageContent />
+    </Suspense>
   )
 }

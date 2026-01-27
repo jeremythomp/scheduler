@@ -55,10 +55,10 @@ model ServiceBooking {
   serviceName          String
   scheduledDate        DateTime
   scheduledTime        String
+  location             String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  @@unique([serviceName, scheduledDate, scheduledTime])
   @@map("service_bookings")
 }
 

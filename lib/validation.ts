@@ -5,6 +5,7 @@ export const serviceBookingSchema = z.object({
   serviceName: z.string().min(1, "Service name is required"),
   scheduledDate: z.string().min(1, "Scheduled date is required"),
   scheduledTime: z.string().min(1, "Scheduled time is required"),
+  location: z.string().optional(),
 })
 
 export type ServiceBookingInput = z.infer<typeof serviceBookingSchema>
@@ -26,7 +27,6 @@ export const bookingFormSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  referenceNumber: z.string().min(1, "Reference number is required"),
 })
 
 export type BookingFormInput = z.infer<typeof bookingFormSchema>

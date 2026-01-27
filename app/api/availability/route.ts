@@ -6,15 +6,18 @@ import { withRetry } from "@/lib/server/db-utils"
 const serviceTypeMap: Record<string, string> = {
   inspection: "Vehicle Inspection",
   weighing: "Vehicle Weighing",
-  registration: "Vehicle Registration"
+  registration: "Vehicle Registration/Customer Service Center"
 }
 
 // Reverse map for flexibility
 const reverseServiceTypeMap: Record<string, string> = {
   "Vehicle Inspection": "inspection",
   "Vehicle Weighing": "weighing",
-  "Vehicle Registration": "registration"
+  "Vehicle Registration/Customer Service Center": "registration"
 }
+
+// Maximum capacity per time slot
+const MAX_CAPACITY_PER_SLOT = 5
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -71,15 +74,26 @@ export async function GET(request: Request) {
     )
   }
 
-  // Transform to a simple structure for the frontend
-  const bookedSlots = result.data!.map(booking => ({
-    date: booking.scheduledDate.toISOString().split('T')[0],
-    time: booking.scheduledTime
-  }))
+  // Count bookings per slot
+  const slotCountMap = new Map<string, number>()
+  
+  result.data!.forEach(booking => {
+    const date = booking.scheduledDate.toISOString().split('T')[0]
+    const time = booking.scheduledTime
+    const key = `${date}|${time}`
+    slotCountMap.set(key, (slotCountMap.get(key) || 0) + 1)
+  })
+
+  // Transform to array of slot counts
+  const slotCounts = Array.from(slotCountMap.entries()).map(([key, count]) => {
+    const [date, time] = key.split('|')
+    return { date, time, count }
+  })
 
   return NextResponse.json({
     success: true,
-    bookedSlots
+    slotCounts,
+    maxCapacity: MAX_CAPACITY_PER_SLOT
   })
 }
 

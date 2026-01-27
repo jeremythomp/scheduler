@@ -9,7 +9,6 @@ type ServiceBookingWithRequest = ServiceBooking & {
   appointmentRequest: Pick<
     AppointmentRequest,
     'id' | 'referenceNumber' | 'customerName' | 'customerEmail' | 'customerPhone' | 
-    'vehicleType' | 'vehicleMake' | 'vehicleModel' | 'licensePlate' | 'vin' | 
     'additionalNotes' | 'status' | 'createdAt'
   >
 }

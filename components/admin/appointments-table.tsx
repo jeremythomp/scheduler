@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
-import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MapPin } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -37,7 +37,7 @@ type SortDirection = "asc" | "desc"
 const serviceColors: Record<string, string> = {
   "Vehicle Inspection": "bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-900/20 dark:text-orange-300",
   "Vehicle Weighing": "bg-gray-100 text-gray-700 ring-gray-600/20 dark:bg-gray-800 dark:text-gray-300",
-  "Vehicle Registration": "bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-300"
+  "Vehicle Registration/Customer Service Center": "bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-300"
 }
 
 export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTableProps) {
@@ -234,9 +234,17 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("ring-1 ring-inset", serviceColors[booking.serviceName] || "")}>
-                        {booking.serviceName.replace("Vehicle ", "")}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge className={cn("ring-1 ring-inset", serviceColors[booking.serviceName] || "")}>
+                          {booking.serviceName.replace("Vehicle ", "")}
+                        </Badge>
+                        {booking.location && (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {booking.location}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-sm">

@@ -1,56 +1,43 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { CalendarX2, Building2, ClipboardCheck, Scale, UserCheck, ArrowRight } from "lucide-react"
+import { ClipboardCheck, Scale, UserCheck, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { MonthCalendar } from "./month-calendar"
+import { TimeSlotPicker } from "./time-slot-picker"
 
 type ServiceType = "inspection" | "weighing" | "registration"
 
-interface TimeSlot {
+interface SlotCount {
+  date: string
   time: string
-  available: boolean
-  booked?: boolean
-}
-
-interface DaySchedule {
-  day: string
-  date: number
-  slots: TimeSlot[]
-  weekend: boolean
-  fullyBooked?: boolean
-  isToday?: boolean
-  isPast?: boolean
+  count: number
 }
 
 // Generate time slots for each service type
 const generateTimeSlots = (serviceType: ServiceType): string[] => {
   switch (serviceType) {
     case "weighing":
-      // Weigh Bridge: 8:30am-12:00pm, break 12:01-1:01pm, then 1:02pm-3:30pm
       return [
         "08:30 AM",
         "09:30 AM",
         "10:30 AM",
         "11:30 AM",
-        // Break period
         "01:02 PM",
         "02:02 PM",
         "03:02 PM",
       ]
     case "inspection":
-      // Vehicle Inspections: 8:30am-11:00am, break 11:01am-1:00pm, then 1:01pm-3:30pm
       return [
         "08:30 AM",
         "09:30 AM",
         "10:30 AM",
-        // Break period
         "01:01 PM",
         "02:01 PM",
         "03:01 PM",
       ]
     case "registration":
-      // Vehicle Registrations: 8:30am-1:30pm, blocked 1:31pm-4:30pm
       return [
         "08:30 AM",
         "09:30 AM",
@@ -64,140 +51,34 @@ const generateTimeSlots = (serviceType: ServiceType): string[] => {
   }
 }
 
-// Helper function to check if a time slot is in the past
-const isTimeSlotInPast = (date: Date, timeString: string): boolean => {
-  const now = new Date()
-  
-  // Parse the time string (e.g., "08:30 AM")
-  const [time, period] = timeString.split(' ')
-  const [hours, minutes] = time.split(':').map(Number)
-  
-  // Convert to 24-hour format
-  let hour24 = hours
-  if (period === 'PM' && hours !== 12) {
-    hour24 = hours + 12
-  } else if (period === 'AM' && hours === 12) {
-    hour24 = 0
-  }
-  
-  // Create a date object for the slot time
-  const slotTime = new Date(date)
-  slotTime.setHours(hour24, minutes, 0, 0)
-  
-  // Check if the slot time is in the past
-  return slotTime < now
-}
-
-// Generate weekly schedule with real dates
-const generateWeekSchedule = (
-  serviceType: ServiceType, 
-  week: "this" | "next",
-  bookedSlots: Array<{ date: string; time: string }> = []
-): DaySchedule[] => {
-  const baseSlots = generateTimeSlots(serviceType)
-  const today = new Date()
-  const currentDate = today.getDate()
-  const currentMonth = today.getMonth()
-  const currentYear = today.getFullYear()
-  
-  // Get the start of the selected week (Monday)
-  const currentDay = today.getDay() // 0 = Sunday, 1 = Monday, etc.
-  const diff = currentDay === 0 ? -6 : 1 - currentDay // Adjust to get Monday
-  const monday = new Date(today)
-  monday.setDate(today.getDate() + diff)
-  
-  // Add 7 days if "next week" is selected
-  if (week === "next") {
-    monday.setDate(monday.getDate() + 7)
-  }
-  
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const weekSchedule: DaySchedule[] = []
-  
-  for (let i = 0; i < 7; i++) {
-    const dayDate = new Date(monday)
-    dayDate.setDate(monday.getDate() + i)
-    
-    const date = dayDate.getDate()
-    const isWeekend = i >= 5 // Saturday and Sunday
-    
-    // Create date objects for comparison (without time)
-    const dayDateOnly = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
-    const todayDateOnly = new Date(currentYear, currentMonth, currentDate)
-    
-    const isPast = dayDateOnly < todayDateOnly
-    const isToday = dayDateOnly.getTime() === todayDateOnly.getTime()
-    
-    // Format date for comparison with API data
-    const dateString = dayDate.toISOString().split('T')[0]
-    
-    // Check which slots are booked from real data
-    const bookedTimes = bookedSlots
-      .filter(slot => slot.date === dateString)
-      .map(slot => slot.time)
-    
-    // Check if day is fully booked (only considering future slots)
-    // Don't count past time slots as part of "fully booked" calculation
-    const futureSlots = baseSlots.filter(time => {
-      if (isPast) return false // Entire day is in the past
-      if (isToday) return !isTimeSlotInPast(dayDate, time) // Only future times today
-      return true // All slots are future
-    })
-    const availableFutureSlots = futureSlots.filter(time => !bookedTimes.includes(time))
-    const isFullyBooked = !isPast && !isWeekend && futureSlots.length > 0 && availableFutureSlots.length === 0
-    
-    weekSchedule.push({
-      day: days[i],
-      date,
-      slots: baseSlots.map((time) => {
-        // Check if this specific time slot is in the past
-        const isSlotInPast = isPast || (isToday && isTimeSlotInPast(dayDate, time))
-        
-        return {
-          time,
-          available: !isSlotInPast && !isWeekend,
-          booked: bookedTimes.includes(time),
-        }
-      }),
-      weekend: isWeekend,
-      fullyBooked: isFullyBooked,
-      isToday,
-      isPast,
-    })
-  }
-  
-  return weekSchedule
-}
+const MAX_CAPACITY_PER_SLOT = 5
 
 export function CalendarSection() {
-  const [selectedWeek, setSelectedWeek] = useState<"this" | "next">("this")
+  const today = new Date()
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear())
   const [selectedService, setSelectedService] = useState<ServiceType>("inspection")
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
-  const [bookedSlots, setBookedSlots] = useState<Array<{ date: string; time: string }>>([])
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [slotCounts, setSlotCounts] = useState<SlotCount[]>([])
+  const [maxCapacity, setMaxCapacity] = useState(MAX_CAPACITY_PER_SLOT)
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
   
-  // Calculate date range for the selected week
+  // Calculate date range for the selected month
   const { startDate, endDate } = useMemo(() => {
-    const today = new Date()
-    const currentDay = today.getDay()
-    const diff = currentDay === 0 ? -6 : 1 - currentDay
-    const monday = new Date(today)
-    monday.setDate(today.getDate() + diff)
-    
-    if (selectedWeek === "next") {
-      monday.setDate(monday.getDate() + 7)
-    }
-    
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
+    const firstDay = new Date(selectedYear, selectedMonth, 1)
+    const lastDay = new Date(selectedYear, selectedMonth + 1, 0)
     
     return {
-      startDate: monday.toISOString().split('T')[0],
-      endDate: sunday.toISOString().split('T')[0]
+      startDate: firstDay.toISOString().split('T')[0],
+      endDate: lastDay.toISOString().split('T')[0]
     }
-  }, [selectedWeek])
+  }, [selectedMonth, selectedYear])
   
-  // Fetch availability when service or week changes
+  // Get time slots for selected service
+  const timeSlots = useMemo(() => generateTimeSlots(selectedService), [selectedService])
+  
+  // Fetch availability when service or month changes
   useEffect(() => {
     const fetchAvailability = async () => {
       setIsLoadingAvailability(true)
@@ -208,232 +89,155 @@ export function CalendarSection() {
         const data = await response.json()
         
         if (data.success) {
-          setBookedSlots(data.bookedSlots)
+          setSlotCounts(data.slotCounts || [])
+          setMaxCapacity(data.maxCapacity || MAX_CAPACITY_PER_SLOT)
         } else {
           console.error("Failed to fetch availability:", data.error)
-          setBookedSlots([])
+          setSlotCounts([])
         }
       } catch (error) {
         console.error("Error fetching availability:", error)
-        setBookedSlots([])
+        setSlotCounts([])
       } finally {
         setIsLoadingAvailability(false)
       }
     }
     
     fetchAvailability()
-  }, [selectedService, selectedWeek, startDate, endDate])
+  }, [selectedService, startDate, endDate])
   
-  // Generate schedule based on selected service, week, and booked slots
-  const weekSchedule = useMemo(
-    () => generateWeekSchedule(selectedService, selectedWeek, bookedSlots),
-    [selectedService, selectedWeek, bookedSlots]
-  )
+  // Reset selections when service changes
+  useEffect(() => {
+    setSelectedDate(null)
+    setSelectedTime(null)
+  }, [selectedService])
+  
+  // Handle month change
+  const handleMonthChange = (month: number, year: number) => {
+    setSelectedMonth(month)
+    setSelectedYear(year)
+    setSelectedDate(null)
+    setSelectedTime(null)
+  }
+  
+  // Handle date selection
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date)
+    setSelectedTime(null)
+  }
+  
+  // Handle time selection
+  const handleTimeSelect = (time: string) => {
+    setSelectedTime(time)
+  }
 
   return (
     <section id="real-time-availability" className="border-t border-border bg-card py-16 scroll-mt-20">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-          <div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">
-              Real-time Availability
-            </h2>
-            <p className="text-muted-foreground">
-              Browse open slots for the upcoming week at the Central Station.
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-4 bg-muted p-2 rounded-full ring-1 ring-border self-start md:self-auto">
-            <Button
-              variant={selectedWeek === "this" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => {
-                setSelectedWeek("this")
-                setSelectedSlot(null)
-              }}
-              className="rounded-full text-sm font-bold"
-            >
-              This Week
-            </Button>
-            <Button
-              variant={selectedWeek === "next" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => {
-                setSelectedWeek("next")
-                setSelectedSlot(null)
-              }}
-              className="rounded-full text-sm font-medium"
-            >
-              Next Week
-            </Button>
-          </div>
+        <div className="mb-10">
+          <h2 className="text-3xl font-bold text-foreground mb-2">
+            Real-time Availability
+          </h2>
+          <p className="text-muted-foreground">
+            Browse available slots throughout the year at the Central Station.
+          </p>
         </div>
         
         {/* Service Tabs */}
-        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-6">
+        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-8">
           <Button
             variant={selectedService === "inspection" ? "default" : "outline"}
             size="lg"
-            onClick={() => {
-              setSelectedService("inspection")
-              setSelectedSlot(null)
-            }}
+            onClick={() => setSelectedService("inspection")}
             className={`rounded-full font-bold transition-all ${
               selectedService === "inspection"
                 ? "bg-primary text-primary-foreground shadow-lg"
                 : "bg-card hover:bg-muted"
             }`}
+            title="Vehicle Inspection"
           >
-            <ClipboardCheck className="h-4 w-4 mr-2" />
-            Vehicle Inspection
+            <ClipboardCheck className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span className="truncate">Vehicle Inspection</span>
           </Button>
           
           <Button
             variant={selectedService === "weighing" ? "default" : "outline"}
             size="lg"
-            onClick={() => {
-              setSelectedService("weighing")
-              setSelectedSlot(null)
-            }}
+            onClick={() => setSelectedService("weighing")}
             className={`rounded-full font-bold transition-all ${
               selectedService === "weighing"
                 ? "bg-primary text-primary-foreground shadow-lg"
                 : "bg-card hover:bg-muted"
             }`}
+            title="Vehicle Weighing"
           >
-            <Scale className="h-4 w-4 mr-2" />
-            Vehicle Weighing
+            <Scale className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span className="truncate">Vehicle Weighing</span>
           </Button>
           
           <Button
             variant={selectedService === "registration" ? "default" : "outline"}
             size="lg"
-            onClick={() => {
-              setSelectedService("registration")
-              setSelectedSlot(null)
-            }}
+            onClick={() => setSelectedService("registration")}
             className={`col-span-2 md:col-span-1 rounded-full font-bold transition-all ${
               selectedService === "registration"
                 ? "bg-primary text-primary-foreground shadow-lg"
                 : "bg-card hover:bg-muted"
             }`}
+            title="Vehicle Registration/Customer Service Center"
           >
-            <UserCheck className="h-4 w-4 mr-2" />
-            Vehicle Registration
+            <UserCheck className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span className="truncate">Vehicle Registration/Customer Service Center</span>
           </Button>
         </div>
         
-        {/* Calendar Grid */}
-        <div className="overflow-hidden rounded-3xl border border-border bg-muted relative">
-          {isLoadingAvailability && (
-            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
-              <div className="text-sm font-medium text-muted-foreground">Loading availability...</div>
-            </div>
-          )}
-          <div className="overflow-x-auto snap-x snap-mandatory md:snap-none md:overflow-x-visible">
-            <div className="inline-block md:block min-w-full">
-              {/* Header Row */}
-              <div className="flex md:grid md:grid-cols-7 border-b border-border bg-card">
-                {weekSchedule.map((day, idx) => (
-                  <div
-                    key={idx}
-                    className={`
-                      p-4 text-center border-r border-border last:border-r-0
-                      w-[120px] flex-shrink-0 md:w-auto md:flex-shrink
-                      snap-start md:snap-align-none
-                      ${day.weekend ? "bg-muted" : ""}
-                      ${day.isToday ? "bg-primary/10" : ""}
-                    `}
-                  >
-                    <span className="block text-xs font-bold uppercase text-muted-foreground mb-1">
-                      {day.day}
-                    </span>
-                    <span
-                      className={`block text-xl font-bold ${
-                        day.weekend ? "text-muted-foreground" : ""
-                      }`}
-                    >
-                      {day.date}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Slots Grid */}
-              <div className="flex md:grid md:grid-cols-7 min-h-[400px]">
-                {weekSchedule.map((day, idx) => (
-                  <div
-                    key={idx}
-                    className={`
-                      p-2 border-r border-border last:border-r-0 flex flex-col gap-2
-                      w-[120px] flex-shrink-0 md:w-auto md:flex-shrink
-                      snap-start md:snap-align-none
-                      ${day.weekend ? "bg-muted" : ""}
-                    `}
-                  >
-                    {day.weekend ? (
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="text-center px-2">
-                          <Building2 className="h-8 w-8 text-muted-foreground/30 mb-2 mx-auto" />
-                          <span className="block text-[10px] md:text-xs font-bold text-muted-foreground leading-tight">
-                            Closed on Weekends
-                          </span>
-                        </div>
-                      </div>
-                    ) : day.fullyBooked ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                        <CalendarX2 className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                        <span className="text-xs font-bold text-muted-foreground">
-                          Fully Booked
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        {day.slots.map((slot, slotIdx) => (
-                          <Button
-                            key={slotIdx}
-                            variant={
-                              selectedSlot === `${day.date}-${slot.time}` ? "default" : "outline"
-                            }
-                            size="sm"
-                            onClick={() => setSelectedSlot(`${day.date}-${slot.time}`)}
-                            disabled={slot.booked || !slot.available}
-                            className={`
-                              w-full py-2 px-3 rounded-lg text-xs font-bold transition-colors
-                              ${
-                                selectedSlot === `${day.date}-${slot.time}`
-                                  ? "bg-primary text-primary-foreground shadow-sm"
-                                  : slot.booked || !slot.available
-                                  ? "bg-muted text-muted-foreground line-through opacity-50 cursor-not-allowed"
-                                  : "bg-card hover:bg-primary hover:text-primary-foreground"
-                              }
-                            `}
-                          >
-                            {slot.time}
-                          </Button>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Legend - Moved to top */}
+        <div className="mb-6 flex items-center justify-center gap-6 text-sm flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 rounded bg-green-50 border-2 border-green-200" />
+            <span className="text-muted-foreground font-medium">Available</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 rounded bg-amber-50 border-2 border-amber-200" />
+            <span className="text-muted-foreground font-medium">Limited</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 rounded bg-red-50 border-2 border-red-200" />
+            <span className="text-muted-foreground font-medium">Fully Booked</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 rounded bg-muted border-2 border-border" />
+            <span className="text-muted-foreground font-medium">Closed/Weekend</span>
           </div>
         </div>
         
-        {/* Legend */}
-        <div className="mt-6 flex items-center justify-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-card border border-border" />
-            <span className="text-muted-foreground">Available</span>
+        {/* Calendar and Time Slots Container */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Month Calendar */}
+          <div className="w-full lg:flex-1">
+            <MonthCalendar
+              currentMonth={selectedMonth}
+              currentYear={selectedYear}
+              selectedDate={selectedDate}
+              onDateSelect={handleDateSelect}
+              onMonthChange={handleMonthChange}
+              slotCounts={slotCounts}
+              totalSlotsPerDay={timeSlots.length}
+              maxCapacity={maxCapacity}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-primary border border-primary" />
-            <span className="text-muted-foreground font-bold">Selected</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-muted" />
-            <span className="text-muted-foreground">Booked / Closed</span>
+          
+          {/* Time Slot Picker - Always visible */}
+          <div className="w-full lg:w-80 xl:w-96">
+            <TimeSlotPicker
+              selectedDate={selectedDate}
+              selectedTime={selectedTime}
+              onTimeSelect={handleTimeSelect}
+              timeSlots={timeSlots}
+              slotCounts={slotCounts}
+              maxCapacity={maxCapacity}
+              isLoadingAvailability={isLoadingAvailability}
+            />
           </div>
         </div>
         

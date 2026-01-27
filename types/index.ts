@@ -4,6 +4,7 @@ export interface ServiceBooking {
   serviceName: string;
   scheduledDate: string;
   scheduledTime: string;
+  location?: string;
   createdAt: string;
   updatedAt: string;
 }

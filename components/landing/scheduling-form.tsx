@@ -14,7 +14,7 @@ type ServiceType = "inspection" | "weighing" | "registration"
 const serviceOptions: { value: ServiceType; label: string; icon: any }[] = [
   { value: "inspection", label: "Vehicle Inspection", icon: ClipboardCheck },
   { value: "weighing", label: "Vehicle Weighing", icon: Scale },
-  { value: "registration", label: "Vehicle Registration", icon: UserCheck },
+  { value: "registration", label: "Vehicle Registration/Customer Service Center", icon: UserCheck },
 ]
 
 export function SchedulingForm() {
@@ -25,7 +25,6 @@ export function SchedulingForm() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
-  const [referenceNumber, setReferenceNumber] = useState("")
 
   const toggleService = (service: ServiceType) => {
     setSelectedServices(prev =>
@@ -42,7 +41,6 @@ export function SchedulingForm() {
       firstName,
       lastName,
       email,
-      referenceNumber,
     })
     // Save all selected services as array
     setSelectedServicesInStore(selectedServices)
@@ -85,9 +83,10 @@ export function SchedulingForm() {
                     className={`w-full sm:w-auto sm:flex-1 rounded-2xl py-6 text-sm font-bold transition-all flex items-center justify-start gap-3 relative ${
                       isSelected ? "ring-2 ring-primary" : "hover:bg-muted"
                     }`}
+                    title={service.label}
                   >
-                    <Icon className="h-5 w-5" />
-                    <span>{service.label}</span>
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate pr-8">{service.label}</span>
                     {isSelected && (
                       <CheckCircle className="h-5 w-5 absolute right-4" />
                     )}
@@ -146,23 +145,8 @@ export function SchedulingForm() {
               onChange={(e) => setEmail(e.target.value)}
               className="rounded-2xl bg-muted border-0 py-6 px-4 ring-1 ring-inset ring-border placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
             />
-          </div>
-          
-          {/* Reference Number */}
-          <div className="space-y-1.5">
-            <Label htmlFor="reference" className="block text-sm font-bold pl-1">
-              Payment Reference Number *
-            </Label>
-            <Input
-              id="reference"
-              type="text"
-              placeholder="Enter reference number"
-              value={referenceNumber}
-              onChange={(e) => setReferenceNumber(e.target.value)}
-              className="rounded-2xl bg-muted border-0 py-6 px-4 ring-1 ring-inset ring-border placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
-            />
-            <p className="text-xs text-muted-foreground pl-1 pt-1">
-              Found on your payment receipt
+            <p className="text-xs text-muted-foreground pl-1">
+              You may use a family member or friend's email if you don't have your own
             </p>
           </div>
           

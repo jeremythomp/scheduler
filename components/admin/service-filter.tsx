@@ -14,7 +14,7 @@ export function ServiceFilter({ value, onValueChange }: ServiceFilterProps) {
         <TabsTrigger value="all">All Services</TabsTrigger>
         <TabsTrigger value="Vehicle Inspection">Inspection</TabsTrigger>
         <TabsTrigger value="Vehicle Weighing">Weighing</TabsTrigger>
-        <TabsTrigger value="Vehicle Registration">Registration</TabsTrigger>
+        <TabsTrigger value="Vehicle Registration/Customer Service Center">Registration</TabsTrigger>
       </TabsList>
     </Tabs>
   )

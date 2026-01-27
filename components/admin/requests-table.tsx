@@ -38,7 +38,7 @@ interface RequestsTableProps {
 
 const serviceIcons: Record<string, { icon: any; color: string }> = {
   "Vehicle Inspection": { icon: Car, color: "orange" },
-  "Vehicle Registration": { icon: BadgeCheck, color: "blue" },
+  "Vehicle Registration/Customer Service Center": { icon: BadgeCheck, color: "blue" },
   "Vehicle Weighing": { icon: Scale, color: "gray" },
   "Vehicle Transfer": { icon: ArrowRightLeft, color: "teal" },
 }
@@ -57,7 +57,7 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
     const matchesSearch =
       !searchQuery ||
       request.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.customerPhone.includes(searchQuery) ||
+      request.customerPhone?.includes(searchQuery) ||
       request.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesStatus && matchesSearch
   })

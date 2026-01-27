@@ -29,7 +29,7 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
     const matchesStatus = statusFilter === "all" || request.status === statusFilter
     const matchesSearch = !searchQuery || 
       request.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.customerPhone.includes(searchQuery) ||
+      request.customerPhone?.includes(searchQuery) ||
       request.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesStatus && matchesSearch
   })
@@ -142,8 +142,8 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {new Date(request.preferredDate).toLocaleDateString()}
-                          <div className="text-gray-500">{request.preferredTime}</div>
+                          {request.preferredDate ? new Date(request.preferredDate).toLocaleDateString() : 'N/A'}
+                          <div className="text-gray-500">{request.preferredTime || 'N/A'}</div>
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(request.status)}</TableCell>
@@ -184,11 +184,11 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                                 {/* Services & Schedule */}
                                 <div>
                                   <h4 className="font-semibold mb-2">Services & Schedule</h4>
-                                  <div className="bg-gray-50 p-3 rounded space-y-1 text-sm">
-                                    <div><span className="font-medium">Services:</span> {request.servicesRequested.join(", ")}</div>
-                                    <div><span className="font-medium">Preferred Date:</span> {new Date(request.preferredDate).toLocaleDateString()}</div>
-                                    <div><span className="font-medium">Preferred Time:</span> {request.preferredTime}</div>
-                                  </div>
+                                    <div className="bg-gray-50 p-3 rounded space-y-1 text-sm">
+                                      <div><span className="font-medium">Services:</span> {request.servicesRequested.join(", ")}</div>
+                                      <div><span className="font-medium">Preferred Date:</span> {request.preferredDate ? new Date(request.preferredDate).toLocaleDateString() : 'N/A'}</div>
+                                      <div><span className="font-medium">Preferred Time:</span> {request.preferredTime || 'N/A'}</div>
+                                    </div>
                                 </div>
 
                                 {/* Additional Notes */}

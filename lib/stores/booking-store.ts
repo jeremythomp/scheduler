@@ -4,6 +4,7 @@ export interface ServiceSelection {
   service: string
   date: string
   time: string
+  location?: string
 }
 
 interface BookingState {
@@ -11,7 +12,6 @@ interface BookingState {
   firstName: string
   lastName: string
   email: string
-  referenceNumber: string
   
   // Multi-service booking
   selectedServices: string[]           // Services user has paid for
@@ -19,7 +19,7 @@ interface BookingState {
   currentServiceIndex: number          // Current step in wizard (0 = service selection, 1+ = time selection)
   
   // Actions
-  setUserInfo: (info: { firstName: string; lastName: string; email: string; referenceNumber: string }) => void
+  setUserInfo: (info: { firstName: string; lastName: string; email: string }) => void
   setSelectedServices: (services: string[]) => void
   setServiceSelection: (serviceIndex: number, selection: ServiceSelection) => void
   setCurrentServiceIndex: (index: number) => void
@@ -36,7 +36,6 @@ export const useBookingStore = create<BookingState>((set, get) => ({
   firstName: '',
   lastName: '',
   email: '',
-  referenceNumber: '',
   selectedServices: [],
   serviceSelections: [],
   currentServiceIndex: 0,
@@ -46,7 +45,6 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     firstName: info.firstName,
     lastName: info.lastName,
     email: info.email,
-    referenceNumber: info.referenceNumber,
   }),
   
   // Set selected services (from initial selection)
@@ -71,7 +69,6 @@ export const useBookingStore = create<BookingState>((set, get) => ({
     firstName: '',
     lastName: '',
     email: '',
-    referenceNumber: '',
     selectedServices: [],
     serviceSelections: [],
     currentServiceIndex: 0,

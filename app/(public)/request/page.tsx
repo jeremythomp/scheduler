@@ -5,32 +5,33 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { bookingFormSchema, type BookingFormInput, serviceSelectionSchema, type ServiceSelectionInput } from "@/lib/validation"
-import { CalendarX2, Building2, ClipboardCheck, Scale, UserCheck, Check, Lock, ArrowRight, ArrowLeft, CheckCircle } from "lucide-react"
+import { ClipboardCheck, Scale, UserCheck, Check, ArrowRight, ArrowLeft, CheckCircle, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useBookingStore, type ServiceSelection } from "@/lib/stores/booking-store"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { MonthCalendar } from "@/components/landing/month-calendar"
+import { TimeSlotPicker } from "@/components/landing/time-slot-picker"
 
 type ServiceType = "inspection" | "weighing" | "registration"
 
-interface TimeSlot {
+interface SlotCount {
+  date: string
   time: string
-  available: boolean
-  booked?: boolean
+  count: number
 }
 
-interface DaySchedule {
-  day: string
-  date: number
-  slots: TimeSlot[]
-  weekend: boolean
-  fullyBooked?: boolean
-  isToday?: boolean
-  isPast?: boolean
-}
+// Location options for registration service
+const REGISTRATION_LOCATIONS = [
+  { value: "The Pine", label: "The Pine" },
+  { value: "Holetown", label: "Holetown" },
+] as const
+
+const DEFAULT_LOCATION = "The Pine"
 
 // Generate time slots for each service type
 const generateTimeSlots = (serviceType: ServiceType): string[] => {
@@ -46,115 +47,12 @@ const generateTimeSlots = (serviceType: ServiceType): string[] => {
   }
 }
 
-// Helper function to check if a time slot is in the past
-const isTimeSlotInPast = (date: Date, timeString: string): boolean => {
-  const now = new Date()
-  
-  // Parse the time string (e.g., "08:30 AM")
-  const [time, period] = timeString.split(' ')
-  const [hours, minutes] = time.split(':').map(Number)
-  
-  // Convert to 24-hour format
-  let hour24 = hours
-  if (period === 'PM' && hours !== 12) {
-    hour24 = hours + 12
-  } else if (period === 'AM' && hours === 12) {
-    hour24 = 0
-  }
-  
-  // Create a date object for the slot time
-  const slotTime = new Date(date)
-  slotTime.setHours(hour24, minutes, 0, 0)
-  
-  // Check if the slot time is in the past
-  return slotTime < now
-}
-
-// Generate weekly schedule with real dates
-const generateWeekSchedule = (
-  serviceType: ServiceType, 
-  week: "this" | "next",
-  bookedSlots: Array<{ date: string; time: string }> = [],
-  userTakenSlots: Array<{ date: string; time: string }> = []
-): DaySchedule[] => {
-  const baseSlots = generateTimeSlots(serviceType)
-  const today = new Date()
-  const currentDate = today.getDate()
-  const currentMonth = today.getMonth()
-  const currentYear = today.getFullYear()
-  
-  const currentDay = today.getDay()
-  const diff = currentDay === 0 ? -6 : 1 - currentDay
-  const monday = new Date(today)
-  monday.setDate(today.getDate() + diff)
-  
-  if (week === "next") {
-    monday.setDate(monday.getDate() + 7)
-  }
-  
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const weekSchedule: DaySchedule[] = []
-  
-  for (let i = 0; i < 7; i++) {
-    const dayDate = new Date(monday)
-    dayDate.setDate(monday.getDate() + i)
-    
-    const date = dayDate.getDate()
-    const isWeekend = i >= 5
-    
-    const dayDateOnly = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate())
-    const todayDateOnly = new Date(currentYear, currentMonth, currentDate)
-    
-    const isPast = dayDateOnly < todayDateOnly
-    const isToday = dayDateOnly.getTime() === todayDateOnly.getTime()
-    
-    const dateString = dayDate.toISOString().split('T')[0]
-    
-    const bookedTimes = bookedSlots
-      .filter(slot => slot.date === dateString)
-      .map(slot => slot.time)
-    
-    const userTakenTimes = userTakenSlots
-      .filter(slot => slot.date === dateString)
-      .map(slot => slot.time)
-    
-    // Check if day is fully booked (only considering future slots)
-    // Don't count past time slots as part of "fully booked" calculation
-    const futureSlots = baseSlots.filter(time => {
-      if (isPast) return false // Entire day is in the past
-      if (isToday) return !isTimeSlotInPast(dayDate, time) // Only future times today
-      return true // All slots are future
-    })
-    const availableFutureSlots = futureSlots.filter(time => !bookedTimes.includes(time) && !userTakenTimes.includes(time))
-    const isFullyBooked = !isPast && !isWeekend && futureSlots.length > 0 && availableFutureSlots.length === 0
-    
-    weekSchedule.push({
-      day: days[i],
-      date,
-      slots: baseSlots.map((time) => {
-        // Check if this specific time slot is in the past
-        const isSlotInPast = isPast || (isToday && isTimeSlotInPast(dayDate, time))
-        
-        return {
-          time,
-          available: !isSlotInPast && !isWeekend && !userTakenTimes.includes(time),
-          booked: bookedTimes.includes(time) || userTakenTimes.includes(time),
-        }
-      }),
-      weekend: isWeekend,
-      fullyBooked: isFullyBooked,
-      isToday,
-      isPast,
-    })
-  }
-  
-  return weekSchedule
-}
+const MAX_CAPACITY_PER_SLOT = 5
 
 const serviceTypeMap: Record<ServiceType, string> = {
   inspection: "Vehicle Inspection",
   weighing: "Vehicle Weighing",
-  registration: "Vehicle Registration"
+  registration: "Vehicle Registration/Customer Service Center"
 }
 
 const serviceIcons: Record<ServiceType, any> = {
@@ -166,15 +64,24 @@ const serviceIcons: Record<ServiceType, any> = {
 export default function RequestPage() {
   const router = useRouter()
   const bookingStore = useBookingStore()
+  const today = new Date()
   
   // Wizard state
   const [wizardStep, setWizardStep] = useState<'info' | 'services' | 'time' | 'review'>('info')
   const [currentServiceIndex, setCurrentServiceIndex] = useState(0)
   
   // Calendar state
-  const [selectedWeek, setSelectedWeek] = useState<"this" | "next">("this")
-  const [bookedSlots, setBookedSlots] = useState<Array<{ date: string; time: string }>>([])
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [slotCounts, setSlotCounts] = useState<SlotCount[]>([])
+  const [maxCapacity, setMaxCapacity] = useState(MAX_CAPACITY_PER_SLOT)
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
+  
+  // Location state for registration service
+  const [selectedLocation, setSelectedLocation] = useState<string>(DEFAULT_LOCATION)
+  const [showLocationModal, setShowLocationModal] = useState(false)
+  const [pendingTimeSelection, setPendingTimeSelection] = useState<string | null>(null)
   
   // Form state
   const [isLoading, setIsLoading] = useState(false)
@@ -186,19 +93,17 @@ export default function RequestPage() {
       firstName: "",
       lastName: "",
       email: "",
-      referenceNumber: "",
     }
   })
   
   // Check if coming from Quick Schedule with pre-filled data
   useEffect(() => {
-    if (bookingStore.firstName && bookingStore.email && bookingStore.referenceNumber) {
+    if (bookingStore.firstName && bookingStore.email) {
       // Pre-populate the form with data from store
       userInfoForm.reset({
         firstName: bookingStore.firstName,
         lastName: bookingStore.lastName,
         email: bookingStore.email,
-        referenceNumber: bookingStore.referenceNumber,
       })
       
       // If services are also selected, skip directly to time selection
@@ -212,61 +117,55 @@ export default function RequestPage() {
     }
   }, []) // Run only on mount
   
-  // Calculate date range for the selected week
+  // Calculate date range for the selected month
   const { startDate, endDate } = useMemo(() => {
-    const today = new Date()
-    const currentDay = today.getDay()
-    const diff = currentDay === 0 ? -6 : 1 - currentDay
-    const monday = new Date(today)
-    monday.setDate(today.getDate() + diff)
-    
-    if (selectedWeek === "next") {
-      monday.setDate(monday.getDate() + 7)
-    }
-    
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
+    const firstDay = new Date(selectedYear, selectedMonth, 1)
+    const lastDay = new Date(selectedYear, selectedMonth + 1, 0)
     
     return {
-      startDate: monday.toISOString().split('T')[0],
-      endDate: sunday.toISOString().split('T')[0]
+      startDate: firstDay.toISOString().split('T')[0],
+      endDate: lastDay.toISOString().split('T')[0]
     }
-  }, [selectedWeek])
+  }, [selectedMonth, selectedYear])
   
   // Get current service being booked
   const currentService = bookingStore.selectedServices[currentServiceIndex] as ServiceType | undefined
+  
+  // Get time slots for current service
+  const timeSlots = useMemo(() => currentService ? generateTimeSlots(currentService) : [], [currentService])
   
   // Fetch availability when service changes
   useEffect(() => {
     if (wizardStep === 'time' && currentService) {
       fetchAvailability(currentService)
     }
-  }, [currentService, selectedWeek, startDate, endDate, wizardStep])
+  }, [currentService, startDate, endDate, wizardStep])
 
   const fetchAvailability = async (service: ServiceType) => {
-      setIsLoadingAvailability(true)
-      
-        try {
-          const response = await fetch(
+    setIsLoadingAvailability(true)
+    
+    try {
+      const response = await fetch(
         `/api/availability?service=${service}&startDate=${startDate}&endDate=${endDate}`
-          )
-          const data = await response.json()
-          
-          if (response.ok && data.success) {
-            setBookedSlots(data.bookedSlots)
-          } else {
-            console.error("Failed to fetch availability:", data.error)
-            setBookedSlots([])
-            if (response.status === 503) {
-              toast.error("Service Temporarily Unavailable", {
-                description: "Unable to load availability. Please try again in a moment."
-              })
-            }
-          }
-        } catch (error) {
-            console.error("Error fetching availability:", error)
-            setBookedSlots([])
-            toast.error("Connection Error", {
+      )
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setSlotCounts(data.slotCounts || [])
+        setMaxCapacity(data.maxCapacity || MAX_CAPACITY_PER_SLOT)
+      } else {
+        console.error("Failed to fetch availability:", data.error)
+        setSlotCounts([])
+        if (response.status === 503) {
+          toast.error("Service Temporarily Unavailable", {
+            description: "Unable to load availability. Please try again in a moment."
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching availability:", error)
+      setSlotCounts([])
+      toast.error("Connection Error", {
         description: "Unable to load availability. Please check your connection."
       })
     } finally {
@@ -274,8 +173,19 @@ export default function RequestPage() {
     }
   }
 
-  // Get slots already taken by user for other services
+  // Get slots already taken by user for other services (to mark as unavailable)
   const userTakenSlots = useMemo(() => {
+    return bookingStore.serviceSelections
+      .filter((_, idx) => idx !== currentServiceIndex)
+      .map(selection => ({
+        date: selection.date,
+        time: selection.time,
+        count: 1 // Treat as 1 booking
+      }))
+  }, [bookingStore.serviceSelections, currentServiceIndex])
+  
+  // Get list of date/time combinations taken by user (for visual disabled state)
+  const userTakenSlotsList = useMemo(() => {
     return bookingStore.serviceSelections
       .filter((_, idx) => idx !== currentServiceIndex)
       .map(selection => ({
@@ -283,11 +193,25 @@ export default function RequestPage() {
         time: selection.time
       }))
   }, [bookingStore.serviceSelections, currentServiceIndex])
-
-  const weekSchedule = useMemo(
-    () => currentService ? generateWeekSchedule(currentService, selectedWeek, bookedSlots, userTakenSlots) : [],
-    [currentService, selectedWeek, bookedSlots, userTakenSlots]
-  )
+  
+  // Combine real slot counts with user's taken slots for display
+  const combinedSlotCounts = useMemo(() => {
+    const combined = [...slotCounts]
+    
+    // Add user taken slots to the counts
+    userTakenSlots.forEach(userSlot => {
+      const existing = combined.find(s => s.date === userSlot.date && s.time === userSlot.time)
+      if (existing) {
+        // Slot already has bookings, increment count
+        existing.count += 1
+      } else {
+        // Add new slot count
+        combined.push(userSlot)
+      }
+    })
+    
+    return combined
+  }, [slotCounts, userTakenSlots])
 
   // Handle user info submission
   const handleUserInfoSubmit = (data: BookingFormInput) => {
@@ -305,43 +229,62 @@ export default function RequestPage() {
     setWizardStep('time')
   }
 
+  // Handle month change
+  const handleMonthChange = (month: number, year: number) => {
+    setSelectedMonth(month)
+    setSelectedYear(year)
+    setSelectedDate(null)
+  }
+  
+  // Handle date selection
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date)
+  }
+  
   // Handle time slot selection
-  const handleTimeSlotSelect = (date: number, time: string) => {
-    if (!currentService) return
+  const handleTimeSelect = (time: string) => {
+    if (!currentService || !selectedDate) return
     
-    // Calculate the full date
-      const today = new Date()
-      const currentDay = today.getDay()
-      const diff = currentDay === 0 ? -6 : 1 - currentDay
-      const monday = new Date(today)
-      monday.setDate(today.getDate() + diff)
-      
-      if (selectedWeek === "next") {
-        monday.setDate(monday.getDate() + 7)
-      }
-      
-    const selectedDayIndex = weekSchedule.findIndex(day => day.date === date)
-      if (selectedDayIndex !== -1) {
-        const selectedDate = new Date(monday)
-        selectedDate.setDate(monday.getDate() + selectedDayIndex)
-        const formattedDate = selectedDate.toISOString().split('T')[0]
-        
-      // Check if this slot is already taken by another service
-      if (bookingStore.isTimeSlotTaken(formattedDate, time)) {
-        toast.error("Time slot already selected for another service")
-        return
-      }
-      
-      bookingStore.setServiceSelection(currentServiceIndex, {
-        service: serviceTypeMap[currentService],
-        date: formattedDate,
-        time: time
-      })
-      
-      toast.success(`${serviceTypeMap[currentService]} booked for ${time}`, {
-        icon: <CheckCircle className="h-4 w-4" />
-      })
+    // Check if this slot is already taken by another service
+    if (bookingStore.isTimeSlotTaken(selectedDate, time)) {
+      toast.error("Time slot already selected for another service")
+      return
     }
+    
+    // For registration service, show location modal
+    if (currentService === "registration") {
+      setPendingTimeSelection(time)
+      setShowLocationModal(true)
+      return
+    }
+    
+    // For other services, save immediately
+    bookingStore.setServiceSelection(currentServiceIndex, {
+      service: serviceTypeMap[currentService],
+      date: selectedDate,
+      time: time,
+    })
+  }
+
+  // Handle location modal confirm
+  const handleLocationConfirm = () => {
+    if (!currentService || !selectedDate || !pendingTimeSelection) return
+    
+    bookingStore.setServiceSelection(currentServiceIndex, {
+      service: serviceTypeMap[currentService],
+      date: selectedDate,
+      time: pendingTimeSelection,
+      location: selectedLocation,
+    })
+    
+    setShowLocationModal(false)
+    setPendingTimeSelection(null)
+  }
+
+  // Handle location modal cancel
+  const handleLocationCancel = () => {
+    setShowLocationModal(false)
+    setPendingTimeSelection(null)
   }
 
   // Navigate to next service or review
@@ -353,7 +296,12 @@ export default function RequestPage() {
 
     if (currentServiceIndex < bookingStore.selectedServices.length - 1) {
       setCurrentServiceIndex(currentServiceIndex + 1)
-      setSelectedWeek("this") // Reset to current week
+      // Reset calendar to current month
+      setSelectedMonth(today.getMonth())
+      setSelectedYear(today.getFullYear())
+      setSelectedDate(null)
+      // Reset location to default
+      setSelectedLocation(DEFAULT_LOCATION)
     } else {
       setWizardStep('review')
     }
@@ -363,6 +311,12 @@ export default function RequestPage() {
   const handlePreviousService = () => {
     if (currentServiceIndex > 0) {
       setCurrentServiceIndex(currentServiceIndex - 1)
+      // Reset calendar to current month
+      setSelectedMonth(today.getMonth())
+      setSelectedYear(today.getFullYear())
+      setSelectedDate(null)
+      // Reset location to default
+      setSelectedLocation(DEFAULT_LOCATION)
     } else {
       setWizardStep('services')
     }
@@ -382,9 +336,10 @@ export default function RequestPage() {
         serviceBookings: bookingStore.serviceSelections.map(s => ({
           serviceName: s.service,
           scheduledDate: s.date,
-          scheduledTime: s.time
+          scheduledTime: s.time,
+          location: s.location
         })),
-        additionalNotes: `Payment Reference: ${bookingStore.referenceNumber}`
+        additionalNotes: ""
       }
 
       const response = await fetch("/api/requests", {
@@ -409,6 +364,9 @@ export default function RequestPage() {
   }
 
   const currentSelection = bookingStore.getServiceSelection(currentServiceIndex)
+  
+  // Only show time as selected if it matches the currently selected date
+  const displayedSelectedTime = (currentSelection?.date === selectedDate) ? currentSelection?.time : null
 
   return (
     <div className="bg-gradient-to-b from-background to-muted/30 py-12 px-4 min-h-screen">
@@ -493,28 +451,14 @@ export default function RequestPage() {
                         <FormControl>
                           <Input type="email" placeholder="john.doe@example.com" {...field} />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          You may use a family member or friend's email if you don't have your own
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   
-                  <FormField
-                    control={userInfoForm.control}
-                    name="referenceNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Reference Number *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter reference from receipt" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        <p className="text-xs text-muted-foreground">
-                          Found on your payment receipt
-                        </p>
-                      </FormItem>
-                    )}
-                  />
-
                   <Button type="submit" className="w-full" size="lg">
                     Continue to Services
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -552,12 +496,13 @@ export default function RequestPage() {
                           : [...bookingStore.selectedServices, service]
                         bookingStore.setSelectedServices(newServices)
                       }}
-                      className={`rounded-xl font-bold transition-all h-auto py-6 flex-col gap-2 ${
+                      className={`rounded-xl font-bold transition-all h-auto py-6 flex-col gap-2 relative overflow-hidden ${
                         isSelected ? "ring-2 ring-primary" : ""
                       }`}
+                      title={serviceTypeMap[service]}
                     >
-                      <Icon className="h-6 w-6" />
-                      <span className="text-sm">{serviceTypeMap[service]}</span>
+                      <Icon className="h-6 w-6 flex-shrink-0" />
+                      <span className="text-xs text-center leading-tight line-clamp-3 px-1 max-w-full break-words hyphens-auto">{serviceTypeMap[service]}</span>
                       {isSelected && <CheckCircle className="h-5 w-5 absolute top-2 right-2" />}
                     </Button>
                   )
@@ -602,10 +547,10 @@ export default function RequestPage() {
                   Schedule: {serviceTypeMap[currentService]}
                 </CardTitle>
                 <CardDescription>
-                  Service {currentServiceIndex + 1} of {bookingStore.selectedServices.length} - 
+                  Service {currentServiceIndex + 1} of {bookingStore.selectedServices.length}
                   {currentSelection && (
                     <span className="text-primary font-semibold ml-2">
-                      Selected: {currentSelection.time}
+                      - Selected: {new Date(currentSelection.date).toLocaleDateString()} at {currentSelection.time}
                     </span>
                   )}
                 </CardDescription>
@@ -614,152 +559,66 @@ export default function RequestPage() {
 
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Select Time Slot</CardTitle>
-                  <div className="flex items-center gap-2 bg-muted p-1 rounded-full ring-1 ring-border">
-                    <Button
-                      variant={selectedWeek === "this" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setSelectedWeek("this")}
-                      className="rounded-full text-xs font-bold"
-                    >
-                      This Week
-                    </Button>
-                    <Button
-                      variant={selectedWeek === "next" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setSelectedWeek("next")}
-                      className="rounded-full text-xs font-medium"
-                    >
-                      Next Week
-                    </Button>
+                <CardTitle>Select Date & Time</CardTitle>
+                <CardDescription>
+                  Choose an available date, then select a time slot
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Legend - Moved to top */}
+                <div className="mb-4 flex items-center justify-center gap-3 text-xs flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded bg-green-50 border-2 border-green-200" />
+                    <span className="text-muted-foreground font-medium">Available</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded bg-amber-50 border-2 border-amber-200" />
+                    <span className="text-muted-foreground font-medium">Limited</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded bg-red-50 border-2 border-red-200" />
+                    <span className="text-muted-foreground font-medium">Fully Booked</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded bg-purple-50 border-2 border-purple-300" />
+                    <span className="text-muted-foreground font-medium">Already Selected</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded bg-muted border-2 border-border" />
+                    <span className="text-muted-foreground font-medium">Closed/Weekend</span>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                  <div className="overflow-hidden rounded-2xl border-2 border-border bg-muted relative">
-                    {isLoadingAvailability && (
-                      <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center">
-                        <div className="text-sm font-medium text-muted-foreground">Loading availability...</div>
-                      </div>
-                    )}
-                    <div className="overflow-x-auto">
-                      <div className="inline-block md:block min-w-full">
-                        {/* Header Row */}
-                        <div className="flex md:grid md:grid-cols-7 border-b-2 border-border bg-card">
-                          {weekSchedule.map((day, idx) => (
-                            <div
-                              key={idx}
-                            className={`p-3 text-center border-r border-border last:border-r-0 w-[100px] flex-shrink-0 md:w-auto md:flex-shrink ${
-                              day.weekend ? "bg-muted" : ""
-                            } ${day.isToday ? "bg-primary/10" : ""}`}
-                            >
-                              <span className="block text-xs font-bold uppercase text-muted-foreground mb-1">
-                                {day.day}
-                              </span>
-                            <span className={`block text-lg font-bold ${day.weekend ? "text-muted-foreground" : ""}`}>
-                                {day.date}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Slots Grid */}
-                        <div className="flex md:grid md:grid-cols-7 min-h-[350px]">
-                        {weekSchedule.map((day, idx) => {
-                          const dateString = (() => {
-                            const today = new Date()
-                            const currentDay = today.getDay()
-                            const diff = currentDay === 0 ? -6 : 1 - currentDay
-                            const monday = new Date(today)
-                            monday.setDate(today.getDate() + diff)
-                            if (selectedWeek === "next") monday.setDate(monday.getDate() + 7)
-                            const dayDate = new Date(monday)
-                            dayDate.setDate(monday.getDate() + idx)
-                            return dayDate.toISOString().split('T')[0]
-                          })()
-                          
-                          return (
-                            <div
-                              key={idx}
-                              className={`p-2 border-r border-border last:border-r-0 flex flex-col gap-2 w-[100px] flex-shrink-0 md:w-auto md:flex-shrink ${
-                                day.weekend ? "bg-muted" : ""
-                              }`}
-                            >
-                              {day.weekend ? (
-                                <div className="flex-1 flex items-center justify-center">
-                                  <div className="text-center px-2">
-                                    <Building2 className="h-6 w-6 text-muted-foreground/30 mb-1 mx-auto" />
-                                    <span className="block text-[10px] font-bold text-muted-foreground leading-tight">
-                                      Closed
-                                    </span>
-                                  </div>
-                                </div>
-                              ) : day.fullyBooked ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                                  <CalendarX2 className="h-6 w-6 text-muted-foreground/30 mb-1" />
-                                  <span className="text-[10px] font-bold text-muted-foreground">
-                                    Fully Booked
-                                  </span>
-                                </div>
-                              ) : (
-                                <>
-                                  {day.slots.map((slot, slotIdx) => {
-                                    const isSelected = currentSelection?.date === dateString && currentSelection?.time === slot.time
-                                    const isTakenByUser = userTakenSlots.some(s => s.date === dateString && s.time === slot.time)
-                                    
-                                    return (
-                                    <Button
-                                      key={slotIdx}
-                                        variant={isSelected ? "default" : "outline"}
-                                      size="sm"
-                                        onClick={() => handleTimeSlotSelect(day.date, slot.time)}
-                                      disabled={slot.booked || !slot.available}
-                                        className={`w-full py-1.5 px-2 rounded-lg text-[10px] font-bold transition-colors relative ${
-                                          isSelected
-                                            ? "bg-green-600 hover:bg-green-700 text-white shadow-sm ring-2 ring-green-600"
-                                            : isTakenByUser
-                                            ? "bg-amber-50 text-amber-700 border-amber-300 cursor-not-allowed opacity-60"
-                                            : slot.booked || !slot.available
-                                            ? "bg-muted text-muted-foreground line-through opacity-50 cursor-not-allowed"
-                                            : "bg-card hover:bg-primary hover:text-primary-foreground"
-                                        }`}
-                                    >
-                                        {isTakenByUser && <Lock className="h-3 w-3 absolute top-1 right-1" />}
-                                        {isSelected && <CheckCircle className="h-3 w-3 absolute top-1 right-1" />}
-                                      {slot.time}
-                                    </Button>
-                                    )
-                                  })}
-                                </>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      </div>
-                    </div>
+                
+                {/* Calendar and Time Slots Container */}
+                <div className="flex flex-col lg:flex-row gap-6 items-start">
+                  {/* Month Calendar */}
+                  <div className="w-full lg:flex-1">
+                    <MonthCalendar
+                      currentMonth={selectedMonth}
+                      currentYear={selectedYear}
+                      selectedDate={selectedDate}
+                      onDateSelect={handleDateSelect}
+                      onMonthChange={handleMonthChange}
+                      slotCounts={combinedSlotCounts}
+                      totalSlotsPerDay={timeSlots.length}
+                      maxCapacity={maxCapacity}
+                    />
                   </div>
-
-                  {/* Legend */}
-                <div className="mt-4 flex items-center justify-center gap-4 text-xs flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-full bg-card border border-border" />
-                      <span className="text-muted-foreground">Available</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-green-600" />
-                      <span className="text-muted-foreground font-bold">Selected</span>
-                    </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-amber-200 border border-amber-400" />
-                    <span className="text-muted-foreground">Used by other service</span>
+                  
+                  {/* Time Slot Picker - Always visible */}
+                  <div className="w-full lg:w-80 xl:w-96">
+                    <TimeSlotPicker
+                      selectedDate={selectedDate}
+                      selectedTime={displayedSelectedTime}
+                      onTimeSelect={handleTimeSelect}
+                      timeSlots={timeSlots}
+                      slotCounts={combinedSlotCounts}
+                      maxCapacity={maxCapacity}
+                      isLoadingAvailability={isLoadingAvailability}
+                      userTakenSlots={userTakenSlotsList}
+                    />
                   </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-2.5 w-2.5 rounded-full bg-muted" />
-                      <span className="text-muted-foreground">Booked</span>
-                    </div>
-                  </div>
+                </div>
 
                 <div className="mt-6 flex gap-3">
                   <Button
@@ -798,7 +657,6 @@ export default function RequestPage() {
                 <div className="bg-muted p-4 rounded-lg space-y-1 text-sm">
                   <div><strong>Name:</strong> {bookingStore.firstName} {bookingStore.lastName}</div>
                   <div><strong>Email:</strong> {bookingStore.email}</div>
-                  <div><strong>Payment Ref:</strong> {bookingStore.referenceNumber}</div>
                 </div>
               </div>
 
@@ -815,6 +673,12 @@ export default function RequestPage() {
                           <div className="text-sm text-muted-foreground">
                             {new Date(selection.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} at {selection.time}
                           </div>
+                          {selection.location && (
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3" />
+                              {selection.location}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <CheckCircle className="h-5 w-5 text-green-600" />
@@ -825,7 +689,7 @@ export default function RequestPage() {
 
               {/* Important Notice */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
-                <strong>Important:</strong> Your appointment will be confirmed immediately. Please bring your payment reference and valid ID when you arrive.
+                <strong>Important:</strong> Your appointment will be confirmed immediately. Please bring valid ID when you arrive.
               </div>
 
                 {error && (
@@ -856,6 +720,46 @@ export default function RequestPage() {
           </CardContent>
         </Card>
         )}
+
+        {/* Location Selection Modal */}
+        <Dialog open={showLocationModal} onOpenChange={setShowLocationModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Select Service Location
+              </DialogTitle>
+              <DialogDescription>
+                Please choose where you will go for your Vehicle Registration appointment.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4 space-y-3">
+              {REGISTRATION_LOCATIONS.map((location) => (
+                <button
+                  key={location.value}
+                  onClick={() => setSelectedLocation(location.value)}
+                  className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                    selectedLocation === location.value
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-primary/50"
+                  }`}
+                >
+                  <div className="font-semibold">{location.label}</div>
+                </button>
+              ))}
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={handleLocationCancel}>
+                Cancel
+              </Button>
+              <Button onClick={handleLocationConfirm}>
+                Confirm Location
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

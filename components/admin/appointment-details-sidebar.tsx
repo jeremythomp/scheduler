@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
-import { X, User, Mail, Phone, Calendar, Clock, FileText, Hash, ChevronRight } from "lucide-react"
+import { X, User, Mail, Phone, Calendar, Clock, FileText, Hash, ChevronRight, MapPin } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
 type ServiceBookingWithRequest = ServiceBooking & {
@@ -29,7 +28,7 @@ interface AppointmentDetailsSidebarProps {
 const serviceColors: Record<string, string> = {
   "Vehicle Inspection": "bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-900/20 dark:text-orange-300",
   "Vehicle Weighing": "bg-gray-100 text-gray-700 ring-gray-600/20 dark:bg-gray-800 dark:text-gray-300",
-  "Vehicle Registration": "bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-300"
+  "Vehicle Registration/Customer Service Center": "bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-300"
 }
 
 export function AppointmentDetailsSidebar({ 
@@ -222,6 +221,16 @@ export function AppointmentDetailsSidebar({
                     <p className="text-sm font-medium">{formatTime(displayBooking.scheduledTime)}</p>
                   </div>
                 </div>
+
+                {displayBooking.location && (
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground">Location</p>
+                      <p className="text-sm font-medium">{displayBooking.location}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

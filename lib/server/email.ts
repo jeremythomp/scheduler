@@ -66,7 +66,7 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
  */
 export function createConfirmationEmailContent(
   request: AppointmentRequest & { 
-    serviceBookings?: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string }> 
+    serviceBookings?: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string; location?: string | null }> 
   }
 ): EmailContent {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -76,15 +76,17 @@ export function createConfirmationEmailContent(
   
   // Format service bookings if available
   const servicesList = request.serviceBookings && request.serviceBookings.length > 0
-    ? request.serviceBookings.map(b => 
-        `${b.serviceName} - ${new Date(b.scheduledDate).toLocaleDateString()} at ${b.scheduledTime}`
-      ).join('\n- ')
+    ? request.serviceBookings.map(b => {
+        const locationText = b.location ? ` at ${b.location}` : ''
+        return `${b.serviceName}${locationText} - ${new Date(b.scheduledDate).toLocaleDateString()} at ${b.scheduledTime}`
+      }).join('\n- ')
     : request.servicesRequested.join(', ')
   
   const servicesHtml = request.serviceBookings && request.serviceBookings.length > 0
-    ? request.serviceBookings.map(b => 
-        `<li><strong>${b.serviceName}</strong> - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${b.scheduledTime}</li>`
-      ).join('')
+    ? request.serviceBookings.map(b => {
+        const locationText = b.location ? ` <span style="color: #6b7280;">at ${b.location}</span>` : ''
+        return `<li><strong>${b.serviceName}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${b.scheduledTime}</li>`
+      }).join('')
     : `<li>${request.servicesRequested.join(', ')}</li>`
 
   return {
@@ -232,7 +234,7 @@ ${COMPANY_NAME}`,
  */
 export async function sendConfirmationEmail(
   request: AppointmentRequest & { 
-    serviceBookings?: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string }> 
+    serviceBookings?: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string; location?: string | null }> 
   }
 ): Promise<void> {
   const content = createConfirmationEmailContent(request)
@@ -273,17 +275,19 @@ export function createCancellationEmailContent(data: {
   customerName: string
   customerEmail: string
   referenceNumber: string
-  serviceBookings: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string }>
+  serviceBookings: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string; location?: string | null }>
 }): EmailContent {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
   
-  const servicesList = data.serviceBookings.map(b => 
-    `${b.serviceName} - ${new Date(b.scheduledDate).toLocaleDateString()} at ${b.scheduledTime}`
-  ).join('\n- ')
+  const servicesList = data.serviceBookings.map(b => {
+    const locationText = b.location ? ` at ${b.location}` : ''
+    return `${b.serviceName}${locationText} - ${new Date(b.scheduledDate).toLocaleDateString()} at ${b.scheduledTime}`
+  }).join('\n- ')
   
-  const servicesHtml = data.serviceBookings.map(b => 
-    `<li><strong>${b.serviceName}</strong> - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${b.scheduledTime}</li>`
-  ).join('')
+  const servicesHtml = data.serviceBookings.map(b => {
+    const locationText = b.location ? ` <span style="color: #6b7280;">at ${b.location}</span>` : ''
+    return `<li><strong>${b.serviceName}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${b.scheduledTime}</li>`
+  }).join('')
 
   return {
     subject: `Appointment Cancelled - ${data.referenceNumber}`,
@@ -344,7 +348,7 @@ export async function sendCancellationEmail(data: {
   customerName: string
   customerEmail: string
   referenceNumber: string
-  serviceBookings: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string }>
+  serviceBookings: Array<{ serviceName: string; scheduledDate: Date; scheduledTime: string; location?: string | null }>
 }): Promise<void> {
   const content = createCancellationEmailContent(data)
   await sendEmail({

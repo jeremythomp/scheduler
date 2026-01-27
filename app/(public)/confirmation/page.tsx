@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,7 +22,7 @@ interface AppointmentDetails {
   serviceBookings: ServiceBooking[]
 }
 
-export default function ConfirmationPage() {
+function ConfirmationPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const referenceNumber = searchParams.get("ref")
@@ -84,7 +85,7 @@ export default function ConfirmationPage() {
                 <div>
                   <div className="font-medium">Arrive on Time</div>
                   <div className="text-sm text-muted-foreground">
-                    Please arrive at least 5 minutes before your scheduled time.
+                    Please arrive at least 10 minutes before your scheduled time and dress soberly.
                   </div>
                 </div>
               </div>
@@ -96,7 +97,7 @@ export default function ConfirmationPage() {
                 <div>
                   <div className="font-medium">Payment Verification</div>
                   <div className="text-sm text-muted-foreground">
-                    Staff will verify your payment when you arrive. Please bring your payment receipt.
+                    Staff will verify your payment when you arrive.
                   </div>
                 </div>
               </div>
@@ -113,10 +114,6 @@ export default function ConfirmationPage() {
               <li className="flex items-start gap-2">
                 <span className="font-bold">•</span>
                 <span>Valid identification (Driver's License or ID Card)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold">•</span>
-                <span>Payment receipt (for verification)</span>
               </li>
             </ul>
           </div>
@@ -176,5 +173,13 @@ export default function ConfirmationPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function ConfirmationPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <ConfirmationPageContent />
+    </Suspense>
   )
 }
