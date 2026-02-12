@@ -3,12 +3,14 @@ import { Header } from "@/components/landing/header"
 import { Hero } from "@/components/landing/hero"
 import { CalendarSection } from "@/components/landing/calendar-section"
 import { Footer } from "@/components/landing/footer"
+import { DayBlockNotice } from "@/components/landing/day-block-notice"
 
 export default function Home() {
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
       <OfficialBanner />
       <Header />
+      <DayBlockNotice />
       <main className="flex-1 flex flex-col">
         <Hero />
         <CalendarSection />

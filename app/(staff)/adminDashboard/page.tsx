@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/auth"
-import { getServiceBookings } from "../actions"
+import { getServiceBookings, getCancellationStats } from "../actions"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { AdminFooter } from "@/components/admin/admin-footer"
 import { AppointmentsPageContent } from "@/components/admin/appointments-page-content"
@@ -17,10 +17,13 @@ export default async function AdminDashboardPage() {
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 
-  const bookings = await getServiceBookings({
-    startDate: startOfMonth,
-    endDate: endOfMonth
-  })
+  const [bookings, cancellationStats] = await Promise.all([
+    getServiceBookings({
+      startDate: startOfMonth,
+      endDate: endOfMonth
+    }),
+    getCancellationStats()
+  ])
 
   // Calculate today's stats for header (all services)
   const todayStr = today.toISOString().split('T')[0]
@@ -50,6 +53,7 @@ export default async function AdminDashboardPage() {
         <div className="mx-auto max-w-7xl px-4 md:px-8">
           <AppointmentsPageContent 
             initialBookings={bookings}
+            cancellationStats={cancellationStats}
             userRole={session.user?.role || undefined}
           />
         </div>

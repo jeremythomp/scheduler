@@ -36,7 +36,7 @@ export function MonthCalendar({
   maxCapacity,
 }: MonthCalendarProps) {
   const today = new Date()
-  const todayString = today.toISOString().split('T')[0]
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   
   // Get first day of month and total days
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1)
@@ -208,7 +208,7 @@ export function MonthCalendar({
             
             return (
               <button
-                key={day}
+                key={dateString}
                 onClick={() => {
                   if (availabilityStatus !== 'past' && availabilityStatus !== 'weekend') {
                     onDateSelect(dateString)

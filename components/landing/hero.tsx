@@ -28,14 +28,22 @@ export function Hero() {
               Schedule Your{" "}
               <br />
               <span className="relative inline-block">
+                <span className="relative z-10">Weighing,</span>
+                <span className="absolute bottom-2 left-0 h-3 w-full bg-primary/60 -z-0" />
+              </span>{" "}
+              <span className="relative inline-block">
                 <span className="relative z-10">Inspection</span>
                 <span className="absolute bottom-2 left-0 h-3 w-full bg-primary/60 -z-0" />
               </span>{" "}
-              &amp; Registration
+              and{" "}
+              <span className="relative inline-block">
+                <span className="relative z-10">Registration</span>
+                <span className="absolute bottom-2 left-0 h-3 w-full bg-primary/60 -z-0" />
+              </span>
             </h1>
             
             <p className="text-lg text-muted-foreground max-w-lg mb-10 leading-relaxed">
-              Book official appointments for weighing, safety inspections, and
+              Book official appointments for weighing, inspections, renewals and
               registration renewal online. Avoid the line by reserving your spot
               today.
             </p>

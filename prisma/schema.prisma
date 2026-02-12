@@ -20,6 +20,7 @@ model StaffUser {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   approvedRequests     AppointmentRequest[]  @relation("ApprovedBy")
+  dayBlocks            DayBlock[]
 
   @@map("staff_users")
 }
@@ -31,6 +32,9 @@ model AppointmentRequest {
   customerName        String
   customerEmail       String
   customerPhone       String?
+  companyName         String?
+  numberOfVehicles    Int                @default(1)
+  idNumber            String             @default("")
   servicesRequested   String[]
   preferredDate       DateTime?
   preferredTime       String?
@@ -56,6 +60,7 @@ model ServiceBooking {
   scheduledDate        DateTime
   scheduledTime        String
   location             String?
+  vehicleCount         Int                @default(1)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -79,6 +84,23 @@ model CancellationLog {
   cancelledAt          DateTime           @default(now())
   cancelledVia         String
   ipAddress            String?
+  cancelledByStaff     Int?
+  blockId              Int?
+  block                DayBlock?          @relation(fields: [blockId], references: [id])
   
   @@map("cancellation_logs")
+}
+
+model DayBlock {
+  id                Int                @id @default(autoincrement())
+  date              DateTime
+  blockType         String
+  reason            String
+  publicNote        String
+  createdBy         Int
+  createdByUser     StaffUser          @relation(fields: [createdBy], references: [id])
+  createdAt         DateTime           @default(now())
+  cancellations     CancellationLog[]
+
+  @@map("day_blocks")
 }

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "react-day-picker/style.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -113,6 +114,32 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Calendar: use app theme for contrast and legibility (overrides react-day-picker defaults) */
+.rdp-root {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--accent);
+  --rdp-range_start-color: var(--primary-foreground);
+  --rdp-range_start-date-background-color: var(--primary);
+  --rdp-range_middle-background-color: var(--accent);
+  --rdp-range_middle-color: var(--accent-foreground);
+  --rdp-range_end-color: var(--primary-foreground);
+  --rdp-range_end-date-background-color: var(--primary);
+  --rdp-today-color: var(--foreground);
+}
+
+/* Calendar layout: align weekdays with day columns and keep months horizontal */
+.rdp-root .rdp-month_grid {
+  table-layout: fixed;
+}
+.rdp-root .rdp-weekday {
+  width: var(--rdp-day-width);
+  box-sizing: border-box;
+}
+.rdp-root .rdp-day {
+  width: var(--rdp-day-width);
+  box-sizing: border-box;
 }
 
 @layer base {

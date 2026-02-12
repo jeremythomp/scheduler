@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { CheckCircle, Users } from "lucide-react"
+import { CheckCircle, Car } from "lucide-react"
 
 interface SlotCount {
   date: string
@@ -19,6 +19,10 @@ interface TimeSlotPickerProps {
   maxCapacity: number
   isLoadingAvailability?: boolean
   userTakenSlots?: { date: string; time: string }[]
+  splitSlots?: { time: string; vehicles: number }[]  // Slots in a split booking
+  numberOfVehicles?: number  // Total vehicles being booked
+  constrainedByPreviousService?: boolean  // If true, some slots are disabled by time constraints
+  gridColumns?: string  // Custom grid column classes (e.g., "lg:grid-cols-2")
 }
 
 export function TimeSlotPicker({
@@ -30,6 +34,10 @@ export function TimeSlotPicker({
   maxCapacity,
   isLoadingAvailability = false,
   userTakenSlots = [],
+  splitSlots = [],
+  numberOfVehicles = 1,
+  constrainedByPreviousService = false,
+  gridColumns = "lg:grid-cols-1",
 }: TimeSlotPickerProps) {
   // Get slot availability info
   const getSlotInfo = (time: string) => {
@@ -40,7 +48,9 @@ export function TimeSlotPicker({
     return {
       spotsRemaining,
       isFull: spotsRemaining === 0,
-      isLimited: spotsRemaining > 0 && spotsRemaining <= 2
+      isLimited: spotsRemaining > 0 && spotsRemaining <= 2,
+      hasEnoughCapacity: spotsRemaining >= numberOfVehicles,
+      needsSplit: numberOfVehicles > 1 && spotsRemaining < numberOfVehicles && spotsRemaining > 0
     }
   }
   
@@ -48,6 +58,19 @@ export function TimeSlotPicker({
   const isSlotTakenByUser = (time: string): boolean => {
     if (!selectedDate) return false
     return userTakenSlots.some(slot => slot.date === selectedDate && slot.time === time)
+  }
+  
+  // Check if time slot is part of a split booking
+  const getSplitSlotInfo = (time: string) => {
+    const splitSlot = splitSlots.find(slot => slot.time === time)
+    if (!splitSlot) return null
+    
+    const slotIndex = splitSlots.findIndex(slot => slot.time === time)
+    return {
+      vehicles: splitSlot.vehicles,
+      position: slotIndex + 1,
+      total: splitSlots.length
+    }
   }
   
   // Check if time slot is in the past
@@ -127,15 +150,27 @@ export function TimeSlotPicker({
       <div className="border-b-2 border-border bg-muted/50 p-4">
         <h3 className="font-bold text-lg">Available Time Slots</h3>
         <p className="text-sm text-muted-foreground">{formatDate(selectedDate)}</p>
+        {constrainedByPreviousService && (
+          <div className="mt-2 bg-purple-50 border border-purple-200 rounded px-2 py-1.5 text-xs text-purple-800">
+            <strong>Note:</strong> Some times are disabled - must be after previous service
+          </div>
+        )}
+        {numberOfVehicles > 1 && (
+          <div className="mt-2 bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-xs text-blue-800">
+            Booking {numberOfVehicles} vehicles - may require splitting across slots
+          </div>
+        )}
       </div>
       
       <div className="p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-1 gap-3">
+        <div className={cn("grid grid-cols-2 md:grid-cols-3 gap-3", gridColumns)}>
           {timeSlots.map((time) => {
             const slotInfo = getSlotInfo(time)
             const isSelected = selectedTime === time
             const isPast = isTimeSlotInPast(time)
             const isTakenByUser = isSlotTakenByUser(time)
+            const splitInfo = getSplitSlotInfo(time)
+            const isInSplit = splitInfo !== null
             const isDisabled = slotInfo.isFull || isPast || isTakenByUser
             
             return (
@@ -147,27 +182,46 @@ export function TimeSlotPicker({
                 disabled={isDisabled}
                 className={cn(
                   "flex flex-col items-center justify-center h-auto py-3 px-4 rounded-xl font-bold transition-all relative",
-                  isSelected && "bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-600",
-                  !isSelected && !isDisabled && slotInfo.isLimited && "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100",
-                  !isSelected && !isDisabled && !slotInfo.isLimited && "hover:bg-primary hover:text-primary-foreground",
+                  isSelected && !isInSplit && "bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-600",
+                  isInSplit && "border-2 border-cyan-400 bg-cyan-50 text-cyan-900 hover:bg-cyan-100 ring-2 ring-cyan-300",
+                  !isSelected && !isDisabled && !isInSplit && slotInfo.isLimited && "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100",
+                  !isSelected && !isDisabled && !slotInfo.isLimited && !isInSplit && "hover:bg-primary hover:text-primary-foreground",
                   isTakenByUser && "border-purple-300 bg-purple-50/50 cursor-not-allowed",
                   (isDisabled && !isTakenByUser) && "opacity-50 cursor-not-allowed"
                 )}
               >
-                {isSelected && (
+                {isSelected && !isInSplit && (
                   <CheckCircle className="h-4 w-4 absolute top-2 right-2" />
+                )}
+                
+                {isInSplit && (
+                  <div className="absolute top-1 right-1 bg-cyan-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                    {splitInfo.position}/{splitInfo.total}
+                  </div>
                 )}
                 
                 <span className="text-base mb-1">{time}</span>
                 
-                {isTakenByUser ? (
+                {isInSplit ? (
+                  <span className="text-xs text-cyan-800 font-bold text-center leading-tight">
+                    {splitInfo.vehicles} vehicle{splitInfo.vehicles !== 1 ? 's' : ''}<br />
+                    <span className="text-[10px] font-medium">Split booking</span>
+                  </span>
+                ) : isTakenByUser ? (
                   <span className="text-xs text-purple-700 font-medium text-center leading-tight">
                     Already booked<br />for another service
                   </span>
                 ) : !isDisabled ? (
-                  <span className="flex items-center gap-1 text-xs font-medium">
-                    <Users className="h-3 w-3" />
-                    {slotInfo.spotsRemaining} {slotInfo.spotsRemaining === 1 ? 'spot' : 'spots'}
+                  <span className="flex flex-col items-center gap-0.5 text-xs font-medium">
+                    <span className="flex items-center gap-1">
+                      <Car className="h-3 w-3" />
+                      {slotInfo.spotsRemaining} {slotInfo.spotsRemaining === 1 ? 'spot' : 'spots'}
+                    </span>
+                    {slotInfo.needsSplit && (
+                      <span className="text-[10px] text-amber-600 font-semibold">
+                        Split needed
+                      </span>
+                    )}
                   </span>
                 ) : isPast ? (
                   <span className="text-xs text-muted-foreground">Past</span>

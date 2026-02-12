@@ -5,6 +5,7 @@ export interface ServiceBooking {
   scheduledDate: string;
   scheduledTime: string;
   location?: string;
+  vehicleCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -12,10 +13,12 @@ export interface ServiceBooking {
 export interface AppointmentRequest {
   id: number;
   referenceNumber: string;
-  status: 'pending' | 'approved' | 'denied' | 'confirmed';
+  status: 'pending' | 'approved' | 'denied' | 'confirmed' | 'cancelled' | 'checked_in' | 'no_show';
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  numberOfVehicles: number;
+  idNumber?: string;
   servicesRequested: string[];
   preferredDate?: string;
   preferredTime?: string;
@@ -38,3 +41,9 @@ export interface Service {
   description: string;
 }
 
+export interface RescheduleRequest {
+  bookingId: number;
+  newDate: string;
+  newTime: string;
+  staffNotes?: string;
+}

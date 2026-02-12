@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/server/prisma"
 import { withRetry } from "@/lib/server/db-utils"
 
+const MORNING_SLOTS = ["08:30 AM", "09:30 AM", "10:30 AM", "11:30 AM"]
+const AFTERNOON_SLOTS = ["12:30 PM", "01:30 PM", "02:30 PM"]
+const ALL_SLOTS = [...MORNING_SLOTS, ...AFTERNOON_SLOTS]
+
 // Map short service names to full database names
 const serviceTypeMap: Record<string, string> = {
   inspection: "Vehicle Inspection",
@@ -16,8 +20,19 @@ const reverseServiceTypeMap: Record<string, string> = {
   "Vehicle Registration/Customer Service Center": "registration"
 }
 
-// Maximum capacity per time slot
-const MAX_CAPACITY_PER_SLOT = 5
+// Get max capacity based on service type
+const getMaxCapacity = (service: string): number => {
+  const normalizedKey = reverseServiceTypeMap[service] || service
+  switch (normalizedKey) {
+    case "weighing":
+    case "inspection":
+      return 12
+    case "registration":
+      return 5
+    default:
+      return 5
+  }
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -38,24 +53,43 @@ export async function GET(request: Request) {
   // Normalize service name (accept both formats)
   const normalizedService = serviceTypeMap[service] || service
 
-  // Query service bookings for confirmed appointments
+  // Query service bookings for confirmed and checked-in appointments, and day blocks
   const result = await withRetry(async () => {
-    return await prisma.serviceBooking.findMany({
-      where: {
-        serviceName: normalizedService,
-        scheduledDate: {
-          gte: new Date(startDate),
-          lte: new Date(endDate)
+    const [bookings, dayBlocks] = await Promise.all([
+      prisma.serviceBooking.findMany({
+        where: {
+          serviceName: normalizedService,
+          scheduledDate: {
+            gte: new Date(startDate),
+            lte: new Date(endDate)
+          },
+          appointmentRequest: {
+            status: {
+              in: ["confirmed", "checked_in"]
+            }
+          }
         },
-        appointmentRequest: {
-          status: "confirmed"
+        select: {
+          scheduledDate: true,
+          scheduledTime: true,
+          vehicleCount: true
         }
-      },
-      select: {
-        scheduledDate: true,
-        scheduledTime: true
-      }
-    })
+      }),
+      prisma.dayBlock.findMany({
+        where: {
+          date: {
+            gte: new Date(startDate),
+            lte: new Date(endDate)
+          }
+        },
+        select: {
+          date: true,
+          blockType: true
+        }
+      })
+    ])
+    
+    return { bookings, dayBlocks }
   })
 
   if (!result.success) {
@@ -74,14 +108,49 @@ export async function GET(request: Request) {
     )
   }
 
-  // Count bookings per slot
+  const { bookings, dayBlocks } = result.data!
+
+  // Create a map of blocked dates/slots
+  const blockedSlotsMap = new Map<string, boolean>()
+  
+  dayBlocks.forEach(block => {
+    const dateStr = block.date.toISOString().split('T')[0]
+    let blockedTimes: string[]
+    
+    if (block.blockType === 'full') {
+      blockedTimes = ALL_SLOTS
+    } else if (block.blockType === 'morning') {
+      blockedTimes = MORNING_SLOTS
+    } else {
+      blockedTimes = AFTERNOON_SLOTS
+    }
+    
+    blockedTimes.forEach(time => {
+      const key = `${dateStr}|${time}`
+      blockedSlotsMap.set(key, true)
+    })
+  })
+
+  // Count vehicles per slot (not records)
   const slotCountMap = new Map<string, number>()
   
-  result.data!.forEach(booking => {
+  bookings.forEach(booking => {
     const date = booking.scheduledDate.toISOString().split('T')[0]
     const time = booking.scheduledTime
     const key = `${date}|${time}`
-    slotCountMap.set(key, (slotCountMap.get(key) || 0) + 1)
+    // Sum vehicleCount instead of counting records
+    slotCountMap.set(key, (slotCountMap.get(key) || 0) + (booking.vehicleCount || 1))
+  })
+
+  // Add blocked slots with max capacity (effectively making them unavailable)
+  const maxCapacity = getMaxCapacity(normalizedService)
+  blockedSlotsMap.forEach((_, key) => {
+    if (!slotCountMap.has(key)) {
+      slotCountMap.set(key, maxCapacity)
+    } else {
+      // Ensure blocked slots show as full
+      slotCountMap.set(key, maxCapacity)
+    }
   })
 
   // Transform to array of slot counts
@@ -93,7 +162,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     success: true,
     slotCounts,
-    maxCapacity: MAX_CAPACITY_PER_SLOT
+    maxCapacity
   })
 }
 

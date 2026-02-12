@@ -97,6 +97,37 @@ export function AppointmentsView({
     setSidebarOpen(true)
   }
 
+  const handleRescheduleSuccess = async () => {
+    // Refresh bookings after successful reschedule
+    try {
+      const filters: any = {}
+      
+      if (serviceFilter !== "all") {
+        filters.serviceType = serviceFilter
+      }
+      
+      // For calendar view, fetch current month
+      if (viewMode === "calendar") {
+        const now = new Date()
+        const start = new Date(now.getFullYear(), now.getMonth(), 1)
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        filters.startDate = start
+        filters.endDate = end
+      }
+      
+      const data = await getServiceBookings(filters)
+      setBookings(data as ServiceBookingWithRequest[])
+      
+      // Close the sidebar to show updated data
+      setSidebarOpen(false)
+      setSelectedBooking(null)
+      setSelectedDate(null)
+      setDayBookings([])
+    } catch (error) {
+      console.error("Error refreshing bookings:", error)
+    }
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -145,6 +176,7 @@ export function AppointmentsView({
         booking={selectedBooking}
         dayBookings={dayBookings}
         selectedDate={selectedDate || undefined}
+        onRescheduleSuccess={handleRescheduleSuccess}
       />
     </>
   )

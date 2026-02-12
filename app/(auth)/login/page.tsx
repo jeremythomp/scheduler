@@ -40,10 +40,6 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login/page.tsx:42',message:'Login form submitted',data:{email:data.email,passwordLength:data.password.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-    // #endregion
-
     try {
       const result = await signIn("credentials", {
         email: data.email,
@@ -51,27 +47,12 @@ export default function LoginPage() {
         redirect: false
       })
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login/page.tsx:54',message:'signIn result',data:{hasError:!!result?.error,errorMsg:result?.error,isOk:result?.ok,status:result?.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
-
       if (result?.error) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login/page.tsx:60',message:'Login error branch',data:{error:result.error},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-        // #endregion
         setError("Invalid email or password")
       } else if (result?.ok) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login/page.tsx:67',message:'Login success branch',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-        // #endregion
-        
         // Fetch the session to check mustChangePassword flag
         const response = await fetch('/api/auth/session')
         const session = await response.json()
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login/page.tsx:76',message:'Session fetched',data:{hasSession:!!session,hasUser:!!session?.user,mustChangePassword:session?.user?.mustChangePassword},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-        // #endregion
         
         // Redirect based on mustChangePassword status
         if (session?.user?.mustChangePassword) {
@@ -81,10 +62,7 @@ export default function LoginPage() {
         }
         router.refresh()
       }
-    } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'login/page.tsx:92',message:'Exception caught',data:{errorMsg:(err as Error)?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
+    } catch {
       setError("An error occurred. Please try again.")
     } finally {
       setIsLoading(false)

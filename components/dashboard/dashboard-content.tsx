@@ -142,7 +142,7 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {request.preferredDate ? new Date(request.preferredDate).toLocaleDateString() : 'N/A'}
+                          {request.preferredDate ? new Date(request.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'N/A'}
                           <div className="text-gray-500">{request.preferredTime || 'N/A'}</div>
                         </div>
                       </TableCell>
@@ -186,7 +186,7 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                                   <h4 className="font-semibold mb-2">Services & Schedule</h4>
                                     <div className="bg-gray-50 p-3 rounded space-y-1 text-sm">
                                       <div><span className="font-medium">Services:</span> {request.servicesRequested.join(", ")}</div>
-                                      <div><span className="font-medium">Preferred Date:</span> {request.preferredDate ? new Date(request.preferredDate).toLocaleDateString() : 'N/A'}</div>
+                                      <div><span className="font-medium">Preferred Date:</span> {request.preferredDate ? new Date(request.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'N/A'}</div>
                                       <div><span className="font-medium">Preferred Time:</span> {request.preferredTime || 'N/A'}</div>
                                     </div>
                                 </div>
@@ -233,7 +233,7 @@ export function DashboardContent({ initialRequests }: { initialRequests: Request
                                         <div><span className="font-medium">Reviewed by:</span> {request.approvedByUser.name}</div>
                                       )}
                                       {request.reviewedAt && (
-                                        <div><span className="font-medium">Reviewed at:</span> {new Date(request.reviewedAt).toLocaleString()}</div>
+                                        <div><span className="font-medium">Reviewed at:</span> {new Date(request.reviewedAt).toLocaleString('en-US', { timeZone: 'UTC' })}</div>
                                       )}
                                     </div>
                                   </div>

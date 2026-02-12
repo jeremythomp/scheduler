@@ -196,7 +196,8 @@ export default function ManagePage() {
                             weekday: 'long', 
                             year: 'numeric', 
                             month: 'long', 
-                            day: 'numeric' 
+                            day: 'numeric',
+                            timeZone: 'UTC'
                           })} at {booking.scheduledTime}
                         </div>
                       </div>

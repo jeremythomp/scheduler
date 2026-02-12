@@ -15,40 +15,12 @@ interface SlotCount {
   count: number
 }
 
+// Standard time slots for all services
+const TIME_SLOTS = ["08:30 AM", "09:30 AM", "10:30 AM", "11:30 AM", "12:30 PM", "01:30 PM", "02:30 PM"]
+
 // Generate time slots for each service type
 const generateTimeSlots = (serviceType: ServiceType): string[] => {
-  switch (serviceType) {
-    case "weighing":
-      return [
-        "08:30 AM",
-        "09:30 AM",
-        "10:30 AM",
-        "11:30 AM",
-        "01:02 PM",
-        "02:02 PM",
-        "03:02 PM",
-      ]
-    case "inspection":
-      return [
-        "08:30 AM",
-        "09:30 AM",
-        "10:30 AM",
-        "01:01 PM",
-        "02:01 PM",
-        "03:01 PM",
-      ]
-    case "registration":
-      return [
-        "08:30 AM",
-        "09:30 AM",
-        "10:30 AM",
-        "11:30 AM",
-        "12:30 PM",
-        "01:30 PM",
-      ]
-    default:
-      return []
-  }
+  return TIME_SLOTS
 }
 
 const MAX_CAPACITY_PER_SLOT = 5
@@ -146,21 +118,6 @@ export function CalendarSection() {
         {/* Service Tabs */}
         <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-8">
           <Button
-            variant={selectedService === "inspection" ? "default" : "outline"}
-            size="lg"
-            onClick={() => setSelectedService("inspection")}
-            className={`rounded-full font-bold transition-all ${
-              selectedService === "inspection"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "bg-card hover:bg-muted"
-            }`}
-            title="Vehicle Inspection"
-          >
-            <ClipboardCheck className="h-4 w-4 mr-2 flex-shrink-0" />
-            <span className="truncate">Vehicle Inspection</span>
-          </Button>
-          
-          <Button
             variant={selectedService === "weighing" ? "default" : "outline"}
             size="lg"
             onClick={() => setSelectedService("weighing")}
@@ -173,6 +130,21 @@ export function CalendarSection() {
           >
             <Scale className="h-4 w-4 mr-2 flex-shrink-0" />
             <span className="truncate">Vehicle Weighing</span>
+          </Button>
+          
+          <Button
+            variant={selectedService === "inspection" ? "default" : "outline"}
+            size="lg"
+            onClick={() => setSelectedService("inspection")}
+            className={`rounded-full font-bold transition-all ${
+              selectedService === "inspection"
+                ? "bg-primary text-primary-foreground shadow-lg"
+                : "bg-card hover:bg-muted"
+            }`}
+            title="Vehicle Inspection"
+          >
+            <ClipboardCheck className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span className="truncate">Vehicle Inspection</span>
           </Button>
           
           <Button
@@ -191,30 +163,30 @@ export function CalendarSection() {
           </Button>
         </div>
         
-        {/* Legend - Moved to top */}
-        <div className="mb-6 flex items-center justify-center gap-6 text-sm flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded bg-green-50 border-2 border-green-200" />
-            <span className="text-muted-foreground font-medium">Available</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded bg-amber-50 border-2 border-amber-200" />
-            <span className="text-muted-foreground font-medium">Limited</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded bg-red-50 border-2 border-red-200" />
-            <span className="text-muted-foreground font-medium">Fully Booked</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded bg-muted border-2 border-border" />
-            <span className="text-muted-foreground font-medium">Closed/Weekend</span>
-          </div>
-        </div>
-        
         {/* Calendar and Time Slots Container */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Month Calendar */}
           <div className="w-full lg:flex-1">
+            {/* Legend - Centered above calendar */}
+            <div className="mb-6 flex items-center justify-center gap-4 md:gap-6 text-sm flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded bg-green-50 border-2 border-green-200" />
+                <span className="text-muted-foreground font-medium">Available</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded bg-amber-50 border-2 border-amber-200" />
+                <span className="text-muted-foreground font-medium">Limited</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded bg-red-50 border-2 border-red-200" />
+                <span className="text-muted-foreground font-medium">Fully Booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 rounded bg-muted border-2 border-border" />
+                <span className="text-muted-foreground font-medium">Closed/Weekend</span>
+              </div>
+            </div>
+            
             <MonthCalendar
               currentMonth={selectedMonth}
               currentYear={selectedYear}

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/auth"
-import { getUsers } from "../../actions"
+import { getUsers, getCancellationStats } from "../../actions"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminFooter } from "@/components/admin/admin-footer"
@@ -18,8 +18,11 @@ export default async function UsersPage() {
     redirect("/adminDashboard")
   }
 
-  // Fetch all users
-  const users = await getUsers()
+  // Fetch all users and cancellation stats
+  const [users, cancellationStats] = await Promise.all([
+    getUsers(),
+    getCancellationStats()
+  ])
 
   return (
     <>
@@ -46,6 +49,7 @@ export default async function UsersPage() {
                 thisWeek: 0,
                 total: 0
               }}
+              cancellationStats={cancellationStats}
               userRole={session.user.role}
             />
             <div className="lg:col-span-9">

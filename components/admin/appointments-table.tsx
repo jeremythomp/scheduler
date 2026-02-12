@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
-import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MapPin } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, MapPin, Car } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,8 +22,10 @@ type ServiceBookingWithRequest = ServiceBooking & {
   appointmentRequest: Pick<
     AppointmentRequest,
     'id' | 'referenceNumber' | 'customerName' | 'customerEmail' | 'customerPhone' | 
-    'additionalNotes' | 'status' | 'createdAt'
-  >
+    'numberOfVehicles' | 'idNumber' | 'additionalNotes' | 'status' | 'createdAt'
+  > & {
+    serviceBookings?: Array<Pick<ServiceBooking, 'id' | 'serviceName' | 'scheduledDate' | 'scheduledTime' | 'location' | 'vehicleCount'>>
+  }
 }
 
 interface AppointmentsTableProps {
@@ -133,7 +135,8 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
     return new Date(date).toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
-      day: "numeric"
+      day: "numeric",
+      timeZone: "UTC"
     })
   }
 
@@ -235,9 +238,38 @@ export function AppointmentsTable({ bookings, onBookingClick }: AppointmentsTabl
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <Badge className={cn("ring-1 ring-inset", serviceColors[booking.serviceName] || "")}>
-                          {booking.serviceName.replace("Vehicle ", "")}
-                        </Badge>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={cn("ring-1 ring-inset", serviceColors[booking.serviceName] || "")}>
+                            {booking.serviceName.replace("Vehicle ", "")}
+                          </Badge>
+                          {booking.vehicleCount && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Car className="h-3 w-3" />
+                              <span className="font-medium">
+                                {booking.vehicleCount}
+                                {booking.appointmentRequest.numberOfVehicles > booking.vehicleCount && 
+                                  `/${booking.appointmentRequest.numberOfVehicles}`
+                                }
+                              </span>
+                            </div>
+                          )}
+                          {booking.appointmentRequest.serviceBookings && 
+                           booking.appointmentRequest.serviceBookings.length > 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              Split: {booking.appointmentRequest.serviceBookings.length} slots
+                            </Badge>
+                          )}
+                          {booking.appointmentRequest.status === "checked_in" && (
+                            <Badge className="bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 text-xs">
+                              ✓ Checked In
+                            </Badge>
+                          )}
+                          {booking.appointmentRequest.status === "no_show" && (
+                            <Badge className="bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-900/20 dark:text-red-300 text-xs">
+                              No Show
+                            </Badge>
+                          )}
+                        </div>
                         {booking.location && (
                           <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <MapPin className="h-3 w-3" />

@@ -15,11 +15,17 @@ type ServiceBookingWithRequest = ServiceBooking & {
 
 interface AppointmentsPageContentProps {
   initialBookings: ServiceBookingWithRequest[]
+  cancellationStats?: {
+    today: number
+    thisWeek: number
+    thisMonth: number
+  }
   userRole?: string
 }
 
 export function AppointmentsPageContent({ 
   initialBookings, 
+  cancellationStats,
   userRole 
 }: AppointmentsPageContentProps) {
   const [serviceFilter, setServiceFilter] = useState("all")
@@ -69,6 +75,7 @@ export function AppointmentsPageContent({
       <AdminSidebar 
         pendingCount={0} 
         todayStats={todayStats}
+        cancellationStats={cancellationStats}
         userRole={userRole}
       />
       <div className="lg:col-span-9">

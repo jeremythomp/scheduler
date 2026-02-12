@@ -266,6 +266,7 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
+                              timeZone: "UTC"
                             })}
                           </div>
                           <div className="text-xs text-muted-foreground">{request.preferredTime}</div>
@@ -372,7 +373,7 @@ export function RequestsTable({ initialRequests }: RequestsTableProps) {
                     </div>
                     <div>
                       <span className="font-medium">Preferred Date:</span>{" "}
-                      {new Date(selectedRequest.preferredDate).toLocaleDateString()}
+                      {new Date(selectedRequest.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}
                     </div>
                     <div>
                       <span className="font-medium">Preferred Time:</span> {selectedRequest.preferredTime}

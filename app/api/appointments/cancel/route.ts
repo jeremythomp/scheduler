@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       
       // Create snapshot of service bookings
       const scheduledDates = appointment.serviceBookings.map(booking => 
-        `${booking.serviceName}: ${new Date(booking.scheduledDate).toLocaleDateString()} at ${booking.scheduledTime}`
+        `${booking.serviceName}: ${new Date(booking.scheduledDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.scheduledTime}`
       )
       
       // Create cancellation log with snapshot

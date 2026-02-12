@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Car } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,8 +12,10 @@ type ServiceBookingWithRequest = ServiceBooking & {
   appointmentRequest: Pick<
     AppointmentRequest,
     'id' | 'referenceNumber' | 'customerName' | 'customerEmail' | 'customerPhone' | 
-    'additionalNotes' | 'status' | 'createdAt'
-  >
+    'numberOfVehicles' | 'idNumber' | 'additionalNotes' | 'status' | 'createdAt'
+  > & {
+    serviceBookings?: Array<Pick<ServiceBooking, 'id' | 'serviceName' | 'scheduledDate' | 'scheduledTime' | 'location' | 'vehicleCount'>>
+  }
 }
 
 interface AppointmentsCalendarProps {
@@ -123,6 +125,22 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
         </div>
       </CardHeader>
       <CardContent>
+        {/* Legend */}
+        <div className="mb-4 flex items-center justify-center gap-4 text-xs flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <div className="h-3 w-3 rounded bg-orange-100 border border-orange-300" />
+            <span className="text-muted-foreground">Inspection</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-3 w-3 rounded bg-gray-100 border border-gray-300" />
+            <span className="text-muted-foreground">Weighing</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-3 w-3 rounded bg-blue-100 border border-blue-300" />
+            <span className="text-muted-foreground">Registration</span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
           {/* Day headers */}
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
@@ -157,14 +175,32 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
                 >
                   {day.day}
                 </span>
-                {day.bookings.length > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="h-6 px-2 text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20"
-                  >
-                    {day.bookings.length}
-                  </Badge>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {day.bookings.length > 0 && (
+                    <Badge 
+                      variant="secondary" 
+                      className="h-6 px-2 text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20"
+                    >
+                      {day.bookings.length}
+                    </Badge>
+                  )}
+                  {day.bookings.length > 0 && (() => {
+                    // Count unique vehicles per appointment request, not per service booking
+                    const uniqueRequests = new Map<number, number>()
+                    day.bookings.forEach(b => {
+                      if (!uniqueRequests.has(b.appointmentRequest.id)) {
+                        uniqueRequests.set(b.appointmentRequest.id, b.appointmentRequest.numberOfVehicles)
+                      }
+                    })
+                    const totalVehicles = Array.from(uniqueRequests.values()).reduce((sum, count) => sum + count, 0)
+                    return totalVehicles > 0 && (
+                      <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                        <Car className="h-2.5 w-2.5" />
+                        <span>{totalVehicles}</span>
+                      </div>
+                    )
+                  })()}
+                </div>
               </div>
 
               {/* Service type indicators */}
@@ -186,22 +222,6 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
               )}
             </button>
           ))}
-        </div>
-
-        {/* Legend */}
-        <div className="mt-4 flex items-center justify-center gap-4 text-xs flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded bg-orange-100 border border-orange-300" />
-            <span className="text-muted-foreground">Inspection</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded bg-gray-100 border border-gray-300" />
-            <span className="text-muted-foreground">Weighing</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-3 rounded bg-blue-100 border border-blue-300" />
-            <span className="text-muted-foreground">Registration</span>
-          </div>
         </div>
       </CardContent>
     </Card>
