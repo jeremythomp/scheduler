@@ -1,0 +1,89 @@
+services:
+  # Next.js Full-Stack Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time arguments for NEXT_PUBLIC variables (inlined at build time)
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    container_name: scheduler-app
+    restart: always
+    environment:
+      NODE_ENV: production
+      # Database - set DATABASE_URL in .env
+      # Dev:  postgresql://scheduler_user:scheduler_pass@database:5432/scheduler
+      # Prod: postgresql://scheduler_user:<password>@<DB_VM_PRIVATE_IP>:5432/scheduler
+      DATABASE_URL: ${DATABASE_URL}
+      # Auth.js
+      AUTH_SECRET: ${AUTH_SECRET:-change-this-to-a-random-secret-in-production}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      # SendGrid
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
+      COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
+      # Base URL for email links
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # Redis
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - scheduler-network
+
+  # Redis for Email Queue
+  redis:
+    image: redis:7-alpine
+    container_name: scheduler-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scheduler-network
+
+  # Email Queue Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scheduler-worker
+    restart: always
+    command: ["node", "worker-dist/worker/email-worker.js"]
+    environment:
+      NODE_ENV: production
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # SendGrid
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
+      COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - scheduler-network
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  scheduler-network:
+    external: true

@@ -1,109 +1,17 @@
-services:
-  # Next.js Full-Stack Application
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        # Build-time arguments for NEXT_PUBLIC variables (inlined at build time)
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-    container_name: scheduler-app
-    restart: always
-    environment:
-      NODE_ENV: production
-      # Database
-      DATABASE_URL: postgresql://scheduler_user:${DB_PASSWORD:-scheduler_pass}@database:5432/scheduler
-      # Auth.js
-      AUTH_SECRET: ${AUTH_SECRET:-change-this-to-a-random-secret-in-production}
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
-      # SendGrid
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
-      FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
-      COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
-      # Redis
-      REDIS_URL: redis://redis:6379
-    ports:
-      - "3000:3000"
-    depends_on:
-      database:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    networks:
-      - scheduler-network
+# Development convenience wrapper
+# Runs both the web stack and database stack together on a single machine.
+#
+# Usage:
+#   docker network create scheduler-network   (first time only)
+#   docker compose up -d
+#
+# For production, use the individual files on separate VMs:
+#   VM2 (database): docker compose -f docker-compose.db.yml up -d
+#   VM1 (web):      docker compose -f docker-compose.web.yml up -d --build
 
-  # PostgreSQL Database
-  database:
-    image: postgres:16-alpine
-    container_name: scheduler-database
-    restart: always
-    environment:
-      POSTGRES_DB: scheduler
-      POSTGRES_USER: scheduler_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-scheduler_pass}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scheduler_user -d scheduler"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - scheduler-network
-
-  # Redis for Email Queue
-  redis:
-    image: redis:7-alpine
-    container_name: scheduler-redis
-    restart: always
-    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - scheduler-network
-
-  # Email Queue Worker
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: scheduler-worker
-    restart: always
-    command: ["node", "worker-dist/worker/email-worker.js"]
-    environment:
-      NODE_ENV: production
-      # Redis
-      REDIS_URL: redis://redis:6379
-      # SendGrid
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
-      FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
-      COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - scheduler-network
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
+include:
+  - docker-compose.db.yml
+  - docker-compose.web.yml
 
 networks:
   scheduler-network:
