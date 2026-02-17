@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/server/prisma"
-import { sendCancellationEmail } from "@/lib/server/email"
+import { createCancellationEmailContent } from "@/lib/server/email"
+import { enqueueEmail } from "@/lib/server/email-queue"
 
 export async function POST(request: Request) {
   try {
@@ -92,13 +93,18 @@ export async function POST(request: Request) {
     })
     
     // Send cancellation confirmation email asynchronously
-    sendCancellationEmail({
+    const content = createCancellationEmailContent({
       customerName: appointment.customerName,
       customerEmail: appointment.customerEmail,
       referenceNumber: appointment.referenceNumber,
       serviceBookings: appointment.serviceBookings,
+    })
+    enqueueEmail({
+      type: 'cancellation',
+      to: appointment.customerEmail,
+      ...content,
     }).catch(error => {
-      console.error('Failed to send cancellation email:', error)
+      console.error('Failed to enqueue cancellation email:', error)
     })
     
     return NextResponse.json({

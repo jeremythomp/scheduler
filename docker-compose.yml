@@ -20,10 +20,14 @@ services:
       SENDGRID_API_KEY: ${SENDGRID_API_KEY}
       FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
       COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
+      # Redis
+      REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
     depends_on:
       database:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
@@ -48,15 +52,57 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U scheduler_user"]
+      test: ["CMD-SHELL", "pg_isready -U scheduler_user -d scheduler"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - scheduler-network
 
+  # Redis for Email Queue
+  redis:
+    image: redis:7-alpine
+    container_name: scheduler-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scheduler-network
+
+  # Email Queue Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scheduler-worker
+    restart: always
+    command: ["node", "worker-dist/worker/email-worker.js"]
+    environment:
+      NODE_ENV: production
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # SendGrid
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@example.com}
+      COMPANY_NAME: ${COMPANY_NAME:-Vehicle Inspection Services}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - scheduler-network
+
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

@@ -75,6 +75,7 @@ export function TimeSlotPicker({
   
   // Check if time slot is in the past
   const isTimeSlotInPast = (timeString: string): boolean => {
+    if (!selectedDate) return false
     const now = new Date()
     // Parse date string directly to avoid timezone issues (YYYY-MM-DD format)
     const [year, month, day] = selectedDate.split('-').map(Number)

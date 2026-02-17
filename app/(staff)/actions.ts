@@ -2,9 +2,11 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/server/prisma"
+import { Prisma } from "@prisma/client"
 import { withRetry } from "@/lib/server/db-utils"
 import { revalidatePath } from "next/cache"
-import { sendApprovalEmail, sendDenialEmail, sendWelcomeEmail, sendReschedulingEmail, sendStaffCancellationEmail } from "@/lib/server/email"
+import { sendApprovalEmail, sendDenialEmail, sendWelcomeEmail, sendReschedulingEmail, sendStaffCancellationEmail, createApprovalEmailContent, createDenialEmailContent, createWelcomeEmailContent, createReschedulingEmailContent, createStaffCancellationEmailContent } from "@/lib/server/email"
+import { enqueueEmail } from "@/lib/server/email-queue"
 
 // Helper function to generate a secure temporary password
 function generateTemporaryPassword(): string {
@@ -121,8 +123,13 @@ export async function approveRequest(id: number, staffNotes?: string) {
   }
   
   // Send approval email asynchronously
-  sendApprovalEmail(result.data!).catch(error => {
-    console.error('Failed to send approval email:', error)
+  const content = createApprovalEmailContent(result.data!)
+  enqueueEmail({
+    type: 'approval',
+    to: result.data!.customerEmail,
+    ...content,
+  }).catch(error => {
+    console.error('Failed to enqueue approval email:', error)
   })
   
   revalidatePath("/dashboard")
@@ -151,8 +158,13 @@ export async function denyRequest(id: number, staffNotes?: string) {
   }
   
   // Send denial email asynchronously
-  sendDenialEmail(result.data!).catch(error => {
-    console.error('Failed to send denial email:', error)
+  const content = createDenialEmailContent(result.data!)
+  enqueueEmail({
+    type: 'denial',
+    to: result.data!.customerEmail,
+    ...content,
+  }).catch(error => {
+    console.error('Failed to enqueue denial email:', error)
   })
   
   revalidatePath("/dashboard")
@@ -315,12 +327,17 @@ export async function createUser(data: {
   }
 
   // Send welcome email with credentials (async, non-blocking)
-  sendWelcomeEmail({
+  const content = createWelcomeEmailContent({
     name: data.name,
     email: data.email,
     temporaryPassword
+  })
+  enqueueEmail({
+    type: 'welcome',
+    to: data.email,
+    ...content,
   }).catch(error => {
-    console.error('Failed to send welcome email:', error)
+    console.error('Failed to enqueue welcome email:', error)
   })
   
   revalidatePath("/adminDashboard/users")
@@ -702,7 +719,7 @@ export async function shiftBookingToSlot(
   
   // Send rescheduling notification email
   const dateStr = booking.scheduledDate.toISOString().split('T')[0]
-  sendReschedulingEmail({
+  const content = createReschedulingEmailContent({
     customerName: booking.appointmentRequest.customerName,
     customerEmail: booking.appointmentRequest.customerEmail,
     referenceNumber: booking.appointmentRequest.referenceNumber,
@@ -713,8 +730,13 @@ export async function shiftBookingToSlot(
     newTime: newTime,
     staffNotes: staffNotes,
     cancellationToken: booking.appointmentRequest.cancellationToken || undefined
+  })
+  enqueueEmail({
+    type: 'rescheduling',
+    to: booking.appointmentRequest.customerEmail,
+    ...content,
   }).catch(error => {
-    console.error('Failed to send rescheduling email:', error)
+    console.error('Failed to enqueue rescheduling email:', error)
   })
   
   revalidatePath("/adminDashboard")
@@ -863,14 +885,18 @@ export async function blockDay(data: {
   // Send cancellation emails asynchronously
   const { cancelledAppointments } = result.data!
   for (const appointment of cancelledAppointments) {
-    sendStaffCancellationEmail({
+    const content = createStaffCancellationEmailContent({
       customerName: appointment.customerName,
-      customerEmail: appointment.customerEmail,
       referenceNumber: appointment.referenceNumber,
       publicNote: data.publicNote,
       serviceBookings: appointment.serviceBookings
+    })
+    enqueueEmail({
+      type: 'staff-cancellation',
+      to: appointment.customerEmail,
+      ...content,
     }).catch(error => {
-      console.error('Failed to send staff cancellation email:', error)
+      console.error('Failed to enqueue staff cancellation email:', error)
     })
   }
   
@@ -1045,7 +1071,7 @@ export async function rescheduleServiceBooking(data: {
   }
   
   // Send rescheduling notification email
-  sendReschedulingEmail({
+  const content = createReschedulingEmailContent({
     customerName: booking.appointmentRequest.customerName,
     customerEmail: booking.appointmentRequest.customerEmail,
     referenceNumber: booking.appointmentRequest.referenceNumber,
@@ -1056,8 +1082,13 @@ export async function rescheduleServiceBooking(data: {
     newTime: data.newTime,
     staffNotes: data.staffNotes,
     cancellationToken: booking.appointmentRequest.cancellationToken || undefined
+  })
+  enqueueEmail({
+    type: 'rescheduling',
+    to: booking.appointmentRequest.customerEmail,
+    ...content,
   }).catch(error => {
-    console.error('Failed to send rescheduling email:', error)
+    console.error('Failed to enqueue rescheduling email:', error)
   })
   
   revalidatePath("/adminDashboard")
@@ -1191,7 +1222,7 @@ export async function getAnalyticsData(filters?: {
   const session = await auth()
   if (!session) throw new Error("Unauthorized")
 
-  const where: Parameters<typeof prisma.serviceBooking.findMany>[0]["where"] = {}
+  const where: Prisma.ServiceBookingWhereInput = {}
   if (filters?.serviceType && filters.serviceType !== "all") {
     where.serviceName = filters.serviceType
   }
@@ -1256,7 +1287,7 @@ export async function getCancellationsReport(filters?: {
   const session = await auth()
   if (!session) throw new Error("Unauthorized")
 
-  const where: Parameters<typeof prisma.cancellationLog.findMany>[0]["where"] = {}
+  const where: Prisma.CancellationLogWhereInput = {}
   if (filters?.startDate || filters?.endDate) {
     where.cancelledAt = {}
     if (filters.startDate) where.cancelledAt.gte = filters.startDate

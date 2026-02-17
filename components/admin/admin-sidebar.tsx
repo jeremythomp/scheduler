@@ -28,7 +28,7 @@ interface AdminSidebarProps {
 }
 
 const getNavItems = (userRole?: string) => {
-  const items = [
+  const items: Array<{ title: string; href: string; icon: any; disabled?: boolean }> = [
     {
       title: "Appointments",
       href: "/adminDashboard",

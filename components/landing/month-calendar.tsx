@@ -120,7 +120,7 @@ export function MonthCalendar({
   }
   
   // Get available months (current month + 12 months)
-  const availableMonths = []
+  const availableMonths: Array<{ label: string; value: string; month: number; year: number }> = []
   const currentDate = new Date()
   for (let i = 0; i <= 12; i++) {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1)

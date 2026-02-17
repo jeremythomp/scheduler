@@ -5,6 +5,9 @@ import { CalendarSection } from "@/components/landing/calendar-section"
 import { Footer } from "@/components/landing/footer"
 import { DayBlockNotice } from "@/components/landing/day-block-notice"
 
+// Force dynamic rendering for database-dependent components
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">

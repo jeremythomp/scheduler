@@ -4,7 +4,8 @@ import { withRetry } from "@/lib/server/db-utils"
 import { appointmentRequestSchema } from "@/lib/validation"
 import { generateReferenceNumber } from "@/lib/reference-number"
 import { generateCancellationToken } from "@/lib/cancellation-token"
-import { sendConfirmationEmail } from "@/lib/server/email"
+import { createConfirmationEmailContent } from "@/lib/server/email"
+import { enqueueEmail } from "@/lib/server/email-queue"
 
 // Service capacity configuration
 const SERVICE_CAPACITY: Record<string, number> = {
@@ -47,7 +48,7 @@ async function validateCapacity(
     
     // Sum vehicle counts
     const currentCount = existingBookings.reduce(
-      (sum, b) => sum + (b.vehicleCount || 1), 
+      (sum: number, b: { vehicleCount: number | null }) => sum + (b.vehicleCount || 1), 
       0
     )
     const availableCapacity = maxCapacity - currentCount
@@ -234,8 +235,13 @@ export async function POST(request: Request) {
     }
     
     // Send confirmation email asynchronously (don't block response)
-    sendConfirmationEmail(result.data!).catch(error => {
-      console.error('Failed to send confirmation email:', error)
+    const content = createConfirmationEmailContent(result.data!)
+    enqueueEmail({
+      type: 'confirmation',
+      to: result.data!.customerEmail,
+      ...content,
+    }).catch(error => {
+      console.error('Failed to enqueue confirmation email:', error)
     })
     
     return NextResponse.json({

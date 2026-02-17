@@ -30,6 +30,7 @@ postgres_data/
 # IDE
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~

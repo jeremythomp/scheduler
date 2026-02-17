@@ -128,7 +128,7 @@ export function CalendarSection() {
             }`}
             title="Vehicle Weighing"
           >
-            <Scale className="h-4 w-4 mr-2 flex-shrink-0" />
+            <Scale className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate">Vehicle Weighing</span>
           </Button>
           
@@ -143,7 +143,7 @@ export function CalendarSection() {
             }`}
             title="Vehicle Inspection"
           >
-            <ClipboardCheck className="h-4 w-4 mr-2 flex-shrink-0" />
+            <ClipboardCheck className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate">Vehicle Inspection</span>
           </Button>
           
@@ -158,7 +158,7 @@ export function CalendarSection() {
             }`}
             title="Vehicle Registration/Customer Service Center"
           >
-            <UserCheck className="h-4 w-4 mr-2 flex-shrink-0" />
+            <UserCheck className="h-4 w-4 mr-2 shrink-0" />
             <span className="truncate">Vehicle Registration/Customer Service Center</span>
           </Button>
         </div>

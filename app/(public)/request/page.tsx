@@ -288,6 +288,10 @@ export default function RequestPage() {
     
     // Calculate minimum available time (earliest + 1 hour)
     const minAvailableTime = getNextTimeSlot(earliestTime)
+    if (!minAvailableTime) {
+      // If there's no next time slot, no blocking needed
+      return takenSlots
+    }
     const minTimeIndex = TIME_SLOTS.indexOf(minAvailableTime)
     
     // Block all time slots BEFORE the minimum available time
@@ -337,6 +341,10 @@ export default function RequestPage() {
     
     // Calculate minimum available time (earliest + 1 hour)
     const minAvailableTime = getNextTimeSlot(earliestTime)
+    if (!minAvailableTime) {
+      // If there's no next time slot, no blocking needed
+      return takenSlots
+    }
     const minTimeIndex = TIME_SLOTS.indexOf(minAvailableTime)
     
     // Block all time slots BEFORE the minimum available time
@@ -391,7 +399,8 @@ export default function RequestPage() {
   }, [slotCounts, userTakenSlots])
 
   // Calculate staggered booking slots for next service based on previous service using smart algorithm
-  const calculateStaggeredBooking = (previousServiceIndex: number, nextService: ServiceType) => {
+  // nextServiceSlotCounts: booking counts for the NEXT service (not the current one)
+  const calculateStaggeredBooking = (previousServiceIndex: number, nextService: ServiceType, nextServiceSlotCounts: Array<{date: string, time: string, count: number}>) => {
     const previousSelections = bookingStore.getAllSelectionsForService(previousServiceIndex)
     if (previousSelections.length === 0) return null
     
@@ -402,8 +411,11 @@ export default function RequestPage() {
     const targetDate = previousSelections[0].date
     const maxCapacity = getMaxCapacity(nextService)
     
-    // Get available slots for the target date
-    const slotAvailability = convertToSlotAvailability(combinedSlotCounts, maxCapacity, targetDate)
+    // Get available slots for the target date using the NEXT service's booking data
+    const slotAvailability = convertToSlotAvailability(nextServiceSlotCounts, maxCapacity, targetDate)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'request/page.tsx:calculateStaggeredBooking',message:'Stagger calc inputs',data:{previousServiceIndex,nextService,targetDate,maxCapacity,constraints,slotAvailabilityForDate:slotAvailability.map(s=>({time:s.time,available:s.availableCapacity})),nextServiceSlotCountsForDate:nextServiceSlotCounts.filter(s=>s.date===targetDate).map(s=>({time:s.time,count:s.count}))},timestamp:Date.now(),hypothesisId:'H1-H2'})}).catch(()=>{});
+    // #endregion
     
     // Filter to only slots after each constraint
     const validSlots = slotAvailability.filter(slot => {
@@ -433,8 +445,8 @@ export default function RequestPage() {
         dates.push(formatDateToISO(nextDate))
       }
       
-      // Get multi-day slot availability
-      const multiDaySlots = convertToMultiDaySlotAvailability(combinedSlotCounts, maxCapacity, dates)
+      // Get multi-day slot availability using the NEXT service's booking data
+      const multiDaySlots = convertToMultiDaySlotAvailability(nextServiceSlotCounts, maxCapacity, dates)
       
       // Filter to only slots after each constraint (works across days)
       slotsToUse = multiDaySlots.filter(slot => {
@@ -461,6 +473,9 @@ export default function RequestPage() {
       constraints,
       maxCapacity
     )
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'request/page.tsx:calculateStaggeredBooking:result',message:'Stagger suggestion result',data:{vehicleCount,slotsToUseAvailability:slotsToUse.map(s=>({time:s.time,date:s.date,available:s.availableCapacity})),suggestion:suggestion.map(s=>({time:s.time,date:s.date,vehicles:s.vehicleCount}))},timestamp:Date.now(),hypothesisId:'H1-H3'})}).catch(()=>{});
+    // #endregion
     
     if (suggestion.length === 0) return null
     
@@ -718,6 +733,10 @@ export default function RequestPage() {
       bookingStore.setSplitBookings(currentServiceIndex, additionalSlots)
     }
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'request/page.tsx:handleAcceptStaggerSuggestion',message:'Accepted stagger suggestion',data:{currentServiceIndex,currentService,mainSlotTime:mainSlot.time,mainSlotDate:mainSlot.date,allStaggerSlots:staggerSuggestion,storedSelections:bookingStore.serviceSelections.map((s,i)=>({index:i,service:s?.service,time:s?.time,date:s?.date,vehicleCount:s?.vehicleCount}))},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+    
     // Close dialog and clear suggestion
     setShowStaggerSuggestionDialog(false)
     setStaggerSuggestion(null)
@@ -811,6 +830,22 @@ export default function RequestPage() {
     toast.success(`Booked ${distribution.length} time slot${distribution.length > 1 ? 's' : ''}`)
   }
 
+  // Fetch availability for a specific service (returns slot counts without updating state)
+  const fetchAvailabilityForService = async (service: ServiceType): Promise<Array<{date: string, time: string, count: number}>> => {
+    try {
+      const response = await fetch(
+        `/api/availability?service=${service}&startDate=${startDate}&endDate=${endDate}`
+      )
+      const data = await response.json()
+      if (response.ok && data.success) {
+        return data.slotCounts || []
+      }
+    } catch (error) {
+      console.error("Error fetching availability for next service:", error)
+    }
+    return []
+  }
+
   // Navigate to next service or review
   const handleNextService = async () => {
     if (!bookingStore.isServiceBooked(currentServiceIndex)) {
@@ -822,18 +857,21 @@ export default function RequestPage() {
       const nextServiceIndex = currentServiceIndex + 1
       const nextService = bookingStore.selectedServices[nextServiceIndex] as ServiceType
       
-      // Calculate staggered booking based on current service using smart algorithm
-      const staggeredSlots = calculateStaggeredBooking(currentServiceIndex, nextService)
+      // Fetch the NEXT service's availability data before computing stagger suggestion
+      const nextServiceSlotCounts = await fetchAvailabilityForService(nextService)
+      
+      // Calculate staggered booking using the next service's actual booking data
+      const staggeredSlots = calculateStaggeredBooking(currentServiceIndex, nextService, nextServiceSlotCounts)
       
       if (staggeredSlots && staggeredSlots.length > 0) {
-        // Check if all staggered slots have sufficient capacity
+        // Check if all staggered slots have sufficient capacity using next service's data
         const firstDate = staggeredSlots[0].date
         let allSlotsAvailable = true
         let insufficientSlotInfo: { time: string; available: number; needed: number } | null = null
         
         for (const slot of staggeredSlots) {
-          // Get current bookings for this slot
-          const slotCount = combinedSlotCounts.find(s => s.date === slot.date && s.time === slot.time)?.count || 0
+          // Get current bookings for this slot from the NEXT service's data
+          const slotCount = nextServiceSlotCounts.find(s => s.date === slot.date && s.time === slot.time)?.count || 0
           const capacityForService = getMaxCapacity(nextService)
           const availableSlots = capacityForService - slotCount
           
@@ -847,6 +885,9 @@ export default function RequestPage() {
             break
           }
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/41ada7fd-1087-4968-83f9-c46a84381e41',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'request/page.tsx:handleNextService:capacityCheck',message:'Capacity check result',data:{currentServiceIndex,nextServiceIndex,nextService,staggeredSlots,allSlotsAvailable,insufficientSlotInfo,nextServiceCountsForDate:nextServiceSlotCounts.filter(s=>s.date===staggeredSlots[0]?.date)},timestamp:Date.now(),hypothesisId:'H3-H4'})}).catch(()=>{});
+        // #endregion
         
         if (allSlotsAvailable) {
           // Store suggestion and show confirmation dialog
@@ -1174,7 +1215,7 @@ export default function RequestPage() {
                           // Add service and sort by predefined order
                           const newServices = [...bookingStore.selectedServices, service]
                           const sortedServices = newServices.sort(
-                            (a, b) => SERVICE_ORDER.indexOf(a) - SERVICE_ORDER.indexOf(b)
+                            (a, b) => SERVICE_ORDER.indexOf(a as ServiceType) - SERVICE_ORDER.indexOf(b as ServiceType)
                           )
                           bookingStore.setSelectedServices(sortedServices)
                         }

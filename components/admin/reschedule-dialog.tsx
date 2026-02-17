@@ -286,7 +286,7 @@ export function RescheduleDialog({ open, onOpenChange, booking, onSuccess }: Res
           {selectedDate && selectedTime && (
             <div className="bg-green-50 border-2 border-green-300 rounded-lg p-6 dark:bg-green-900/20 dark:border-green-800">
               <div className="flex items-start gap-4">
-                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                 <div className="flex-1">
                   <p className="font-semibold text-lg text-green-900 dark:text-green-100">
                     New Appointment Selected

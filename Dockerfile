@@ -1,5 +1,5 @@
 # Next.js Full-Stack Application Dockerfile
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -16,6 +16,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Build argument for DATABASE_URL (needed for Prisma generate)
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
 # Generate Prisma Client
 RUN npx prisma generate
 
@@ -28,6 +32,9 @@ ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
 RUN npm run build
+
+# Compile worker TypeScript to JavaScript
+RUN npx tsc worker/email-worker.ts --outDir worker-dist --module commonjs --target ES2020 --moduleResolution node --esModuleInterop --skipLibCheck
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -52,6 +59,12 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy full runtime dependencies for worker process
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# Copy compiled worker output
+COPY --from=builder --chown=nextjs:nodejs /app/worker-dist ./worker-dist
 
 # Copy Prisma files for runtime (schema, migrations, and generated client)
 COPY --from=builder /app/prisma ./prisma
