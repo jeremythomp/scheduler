@@ -18,7 +18,9 @@ interface TimeSlotPickerProps {
   slotCounts: SlotCount[]
   maxCapacity: number
   isLoadingAvailability?: boolean
+  fullyBlockedDates?: string[]
   userTakenSlots?: { date: string; time: string }[]
+  constrainedEarlySlots?: { date: string; time: string }[]  // Slots before earliest previous service (disabled, not "booked")
   splitSlots?: { time: string; vehicles: number }[]  // Slots in a split booking
   numberOfVehicles?: number  // Total vehicles being booked
   constrainedByPreviousService?: boolean  // If true, some slots are disabled by time constraints
@@ -33,12 +35,15 @@ export function TimeSlotPicker({
   slotCounts,
   maxCapacity,
   isLoadingAvailability = false,
+  fullyBlockedDates = [],
   userTakenSlots = [],
+  constrainedEarlySlots = [],
   splitSlots = [],
   numberOfVehicles = 1,
   constrainedByPreviousService = false,
   gridColumns = "lg:grid-cols-1",
 }: TimeSlotPickerProps) {
+  const isSelectedDateClosed = selectedDate !== null && fullyBlockedDates.includes(selectedDate)
   // Get slot availability info
   const getSlotInfo = (time: string) => {
     const slot = slotCounts.find(s => selectedDate && s.date === selectedDate && s.time === time)
@@ -58,6 +63,12 @@ export function TimeSlotPicker({
   const isSlotTakenByUser = (time: string): boolean => {
     if (!selectedDate) return false
     return userTakenSlots.some(slot => slot.date === selectedDate && slot.time === time)
+  }
+
+  // Check if time slot is disabled because it's before the earliest previous service
+  const isConstrainedEarlySlot = (time: string): boolean => {
+    if (!selectedDate) return false
+    return constrainedEarlySlots.some(slot => slot.date === selectedDate && slot.time === time)
   }
   
   // Check if time slot is part of a split booking
@@ -163,16 +174,23 @@ export function TimeSlotPicker({
         )}
       </div>
       
-      <div className="p-4">
+      <div className="p-4 relative">
+        {isSelectedDateClosed && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-b-2xl bg-muted/95 backdrop-blur-sm p-6 text-center">
+            <p className="font-semibold text-foreground">This day is closed</p>
+            <p className="text-sm text-muted-foreground mt-1">Please choose another date.</p>
+          </div>
+        )}
         <div className={cn("grid grid-cols-2 md:grid-cols-3 gap-3", gridColumns)}>
           {timeSlots.map((time) => {
             const slotInfo = getSlotInfo(time)
             const isSelected = selectedTime === time
             const isPast = isTimeSlotInPast(time)
             const isTakenByUser = isSlotTakenByUser(time)
+            const isConstrainedEarly = isConstrainedEarlySlot(time)
             const splitInfo = getSplitSlotInfo(time)
             const isInSplit = splitInfo !== null
-            const isDisabled = slotInfo.isFull || isPast || isTakenByUser
+            const isDisabled = slotInfo.isFull || isPast || isTakenByUser || isConstrainedEarly
             
             return (
               <Button
@@ -211,6 +229,10 @@ export function TimeSlotPicker({
                 ) : isTakenByUser ? (
                   <span className="text-xs text-purple-700 font-medium text-center leading-tight">
                     Already booked<br />for another service
+                  </span>
+                ) : isConstrainedEarly ? (
+                  <span className="text-xs text-muted-foreground text-center leading-tight">
+                    Before previous<br />service
                   </span>
                 ) : !isDisabled ? (
                   <span className="flex flex-col items-center gap-0.5 text-xs font-medium">

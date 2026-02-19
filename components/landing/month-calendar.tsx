@@ -20,6 +20,7 @@ interface MonthCalendarProps {
   slotCounts: SlotCount[]
   totalSlotsPerDay: number
   maxCapacity: number
+  fullyBlockedDates?: string[]
 }
 
 // Maximum capacity per slot
@@ -34,6 +35,7 @@ export function MonthCalendar({
   slotCounts,
   totalSlotsPerDay,
   maxCapacity,
+  fullyBlockedDates = [],
 }: MonthCalendarProps) {
   const today = new Date()
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -50,7 +52,7 @@ export function MonthCalendar({
   ]
   
   // Calculate date availability status
-  const getDateAvailabilityStatus = (dateString: string, dayOfWeek: number): 'available' | 'limited' | 'full' | 'weekend' | 'past' => {
+  const getDateAvailabilityStatus = (dateString: string, dayOfWeek: number): 'available' | 'limited' | 'full' | 'weekend' | 'past' | 'closed' => {
     // Parse date string directly to avoid timezone issues (YYYY-MM-DD format)
     const [year, month, day] = dateString.split('-').map(Number)
     const dateOnly = new Date(year, month - 1, day)
@@ -58,6 +60,9 @@ export function MonthCalendar({
     
     // Check if date is in the past
     if (dateOnly < todayOnly) return 'past'
+    
+    // Check if staff fully blocked (closed) - still selectable
+    if (fullyBlockedDates.includes(dateString)) return 'closed'
     
     // Check if weekend (Saturday = 6, Sunday = 0)
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
@@ -222,6 +227,7 @@ export function MonthCalendar({
                   isSelected && "ring-2 ring-blue-600 ring-inset z-10",
                   availabilityStatus === 'past' && "bg-muted/30 text-muted-foreground/40 cursor-not-allowed",
                   availabilityStatus === 'weekend' && "bg-muted/50 text-muted-foreground cursor-not-allowed",
+                  availabilityStatus === 'closed' && "bg-muted/50 text-muted-foreground cursor-pointer hover:bg-muted/70",
                   availabilityStatus === 'available' && "bg-green-50 text-green-900 hover:bg-green-100 cursor-pointer",
                   availabilityStatus === 'limited' && "bg-amber-50 text-amber-900 hover:bg-amber-100 cursor-pointer",
                   availabilityStatus === 'full' && "bg-red-50 text-red-900 cursor-not-allowed"

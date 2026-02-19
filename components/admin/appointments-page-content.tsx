@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
 import { AdminSidebar } from "./admin-sidebar"
 import { AppointmentsView } from "./appointments-view"
@@ -29,6 +29,10 @@ export function AppointmentsPageContent({
   userRole 
 }: AppointmentsPageContentProps) {
   const [serviceFilter, setServiceFilter] = useState("all")
+  const [refreshToken, setRefreshToken] = useState(0)
+  const handleBlockSuccess = useCallback(() => {
+    setRefreshToken((t) => t + 1)
+  }, [])
 
   // Filter bookings based on selected service
   const filteredBookings = useMemo(() => {
@@ -77,12 +81,14 @@ export function AppointmentsPageContent({
         todayStats={todayStats}
         cancellationStats={cancellationStats}
         userRole={userRole}
+        onBlockSuccess={handleBlockSuccess}
       />
       <div className="lg:col-span-9">
         <AppointmentsView 
           initialBookings={initialBookings}
           serviceFilter={serviceFilter}
           onServiceFilterChange={setServiceFilter}
+          refreshToken={refreshToken}
         />
       </div>
     </div>

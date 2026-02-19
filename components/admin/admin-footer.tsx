@@ -1,5 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
+import { FeedbackForm } from "@/components/feedback/feedback-form"
 
 export function AdminFooter() {
   return (
@@ -23,6 +24,15 @@ export function AdminFooter() {
             <p className="text-white/60 text-sm max-w-xs leading-relaxed">
               Internal Staff Portal for managing vehicle inspections, registrations, and appointments.
             </p>
+          </div>
+
+          {/* Feedback Section */}
+          <div className="mt-8">
+            <h4 className="font-bold mb-3 text-white">Feedback</h4>
+            <p className="text-white/60 text-sm mb-3 max-w-md">
+              Report an issue or share suggestions about the staff portal.
+            </p>
+            <FeedbackForm source="admin_footer" />
           </div>
         </div>
         

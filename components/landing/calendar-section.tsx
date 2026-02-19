@@ -29,11 +29,12 @@ export function CalendarSection() {
   const today = new Date()
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
   const [selectedYear, setSelectedYear] = useState(today.getFullYear())
-  const [selectedService, setSelectedService] = useState<ServiceType>("inspection")
+  const [selectedService, setSelectedService] = useState<ServiceType>("weighing")
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [slotCounts, setSlotCounts] = useState<SlotCount[]>([])
   const [maxCapacity, setMaxCapacity] = useState(MAX_CAPACITY_PER_SLOT)
+  const [fullyBlockedDates, setFullyBlockedDates] = useState<string[]>([])
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
   
   // Calculate date range for the selected month
@@ -63,13 +64,16 @@ export function CalendarSection() {
         if (data.success) {
           setSlotCounts(data.slotCounts || [])
           setMaxCapacity(data.maxCapacity || MAX_CAPACITY_PER_SLOT)
+          setFullyBlockedDates(data.fullyBlockedDates || [])
         } else {
           console.error("Failed to fetch availability:", data.error)
           setSlotCounts([])
+          setFullyBlockedDates([])
         }
       } catch (error) {
         console.error("Error fetching availability:", error)
         setSlotCounts([])
+        setFullyBlockedDates([])
       } finally {
         setIsLoadingAvailability(false)
       }
@@ -196,6 +200,7 @@ export function CalendarSection() {
               slotCounts={slotCounts}
               totalSlotsPerDay={timeSlots.length}
               maxCapacity={maxCapacity}
+              fullyBlockedDates={fullyBlockedDates}
             />
           </div>
           
@@ -209,6 +214,7 @@ export function CalendarSection() {
               slotCounts={slotCounts}
               maxCapacity={maxCapacity}
               isLoadingAvailability={isLoadingAvailability}
+              fullyBlockedDates={fullyBlockedDates}
             />
           </div>
         </div>

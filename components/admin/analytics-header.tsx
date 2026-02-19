@@ -209,7 +209,7 @@ export function AnalyticsHeader({
                   selected={dateRange}
                   onSelect={(range) => {
                     onDateRangeChange(range)
-                    if (range?.from && range?.to) setCalendarOpen(false)
+                    if (range?.from && range?.to && range.from.getTime() !== range.to.getTime()) setCalendarOpen(false)
                   }}
                   numberOfMonths={2}
                   startMonth={new Date(2024, 0)}

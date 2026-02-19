@@ -327,56 +327,37 @@ export default function RequestPage() {
     return takenSlots
   }, [bookingStore.serviceSelections, bookingStore.splitBookings, currentServiceIndex, bookingStore.numberOfVehicles, getEarliestPreviousBookingTime])
   
-  // Get list of date/time combinations taken by user (for visual disabled state)
+  // List of slots actually booked by user for previous services (for "Already booked" label)
   const userTakenSlotsList = useMemo(() => {
     const takenSlots: { date: string; time: string }[] = []
-    
-    // Get the earliest booking time from previous services
+    for (let i = 0; i < currentServiceIndex; i++) {
+      const mainSel = bookingStore.serviceSelections[i]
+      if (mainSel) takenSlots.push({ date: mainSel.date, time: mainSel.time })
+      const splitSels = bookingStore.splitBookings[i] || []
+      splitSels.forEach(s => takenSlots.push({ date: s.date, time: s.time }))
+    }
+    return takenSlots
+  }, [bookingStore.serviceSelections, bookingStore.splitBookings, currentServiceIndex])
+
+  // Slots strictly before the earliest previous booking (for "Before previous service" label)
+  const constrainedEarlySlots = useMemo(() => {
+    const constrainedSlots: { date: string; time: string }[] = []
     const earliestTime = getEarliestPreviousBookingTime()
-    
-    if (!earliestTime) {
-      // No previous bookings, nothing to block
-      return takenSlots
-    }
-    
-    // Calculate minimum available time (earliest + 1 hour)
-    const minAvailableTime = getNextTimeSlot(earliestTime)
-    if (!minAvailableTime) {
-      // If there's no next time slot, no blocking needed
-      return takenSlots
-    }
-    const minTimeIndex = TIME_SLOTS.indexOf(minAvailableTime)
-    
-    // Block all time slots BEFORE the minimum available time
-    // For each date that has previous bookings, mark earlier times as taken
+    if (!earliestTime) return constrainedSlots
+    const earliestTimeIndex = TIME_SLOTS.indexOf(earliestTime)
     const datesWithBookings = new Set<string>()
-    
     for (let i = 0; i < currentServiceIndex; i++) {
       const mainSelection = bookingStore.serviceSelections[i]
-      if (mainSelection) {
-        datesWithBookings.add(mainSelection.date)
-      }
-      
+      if (mainSelection) datesWithBookings.add(mainSelection.date)
       const splitSelections = bookingStore.splitBookings[i] || []
-      splitSelections.forEach(split => {
-        datesWithBookings.add(split.date)
-      })
+      splitSelections.forEach(split => datesWithBookings.add(split.date))
     }
-    
-    // For each date with previous bookings, block times before minimum
     datesWithBookings.forEach(date => {
-      TIME_SLOTS.forEach((time, timeIndex) => {
-        if (timeIndex < minTimeIndex) {
-          // This time is before the minimum available time - block it visually
-          takenSlots.push({
-            date,
-            time
-          })
-        }
+      TIME_SLOTS.forEach((time, idx) => {
+        if (idx < earliestTimeIndex) constrainedSlots.push({ date, time })
       })
     })
-    
-    return takenSlots
+    return constrainedSlots
   }, [bookingStore.serviceSelections, bookingStore.splitBookings, currentServiceIndex, getEarliestPreviousBookingTime])
   
   // Combine real slot counts with user's taken slots for display
@@ -1119,9 +1100,9 @@ export default function RequestPage() {
                     name="companyName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Name (Optional)</FormLabel>
+                        <FormLabel>Company / Organisation (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="ABC Company Ltd" {...field} />
+                          <Input placeholder="ABC Company Ltd / Ministry of Finance" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1157,17 +1138,15 @@ export default function RequestPage() {
                       name="idNumber"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>ID Number</FormLabel>
+                          <FormLabel>Identification Number</FormLabel>
                           <FormControl>
                             <Input 
-                              placeholder="1234567890" 
-                              maxLength={10}
+                              placeholder="e.g. 1234567890"
                               {...field}
-                              onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
                             />
                           </FormControl>
                           <p className="text-xs text-muted-foreground">
-                            National registration number, 10 digits (optional)
+                            National ID, corporate number, or government code (optional)
                           </p>
                           <FormMessage />
                         </FormItem>
@@ -1379,6 +1358,7 @@ export default function RequestPage() {
                       maxCapacity={maxCapacity}
                       isLoadingAvailability={isLoadingAvailability}
                       userTakenSlots={userTakenSlotsList}
+                      constrainedEarlySlots={constrainedEarlySlots}
                       splitSlots={splitSlotsForDisplay}
                       numberOfVehicles={bookingStore.numberOfVehicles}
                       constrainedByPreviousService={currentServiceIndex > 0}
@@ -1424,11 +1404,11 @@ export default function RequestPage() {
                   <div><strong>Name:</strong> {bookingStore.firstName} {bookingStore.lastName}</div>
                   <div><strong>Email:</strong> {bookingStore.email}</div>
                   {bookingStore.companyName && (
-                    <div><strong>Company:</strong> {bookingStore.companyName}</div>
+                    <div><strong>Company / Organisation:</strong> {bookingStore.companyName}</div>
                   )}
                   <div><strong>Number of Vehicles:</strong> {bookingStore.numberOfVehicles}</div>
                   {bookingStore.idNumber && (
-                    <div><strong>ID Number:</strong> {bookingStore.idNumber}</div>
+                    <div><strong>Identification Number:</strong> {bookingStore.idNumber}</div>
                   )}
                 </div>
               </div>

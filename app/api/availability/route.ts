@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/server/prisma"
 import { withRetry } from "@/lib/server/db-utils"
+import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit"
 
 const MORNING_SLOTS = ["08:30 AM", "09:30 AM", "10:30 AM", "11:30 AM"]
 const AFTERNOON_SLOTS = ["12:30 PM", "01:30 PM", "02:30 PM"]
@@ -35,6 +36,16 @@ const getMaxCapacity = (service: string): number => {
 }
 
 export async function GET(request: Request) {
+  // 60 availability checks per IP per minute
+  const ip = getClientIp(request)
+  const rl = checkRateLimit(`availability:${ip}`, { limit: 60, windowMs: 60 * 1000 })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please try again later." },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetAfterMs / 1000)) } }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const service = searchParams.get("service")
   const startDate = searchParams.get("startDate")
@@ -159,10 +170,16 @@ export async function GET(request: Request) {
     return { date, time, count }
   })
 
+  // Fully blocked dates (blockType === 'full') for calendar closed styling
+  const fullyBlockedDates = dayBlocks
+    .filter((block) => block.blockType === "full")
+    .map((block) => block.date.toISOString().split("T")[0])
+
   return NextResponse.json({
     success: true,
     slotCounts,
-    maxCapacity
+    maxCapacity,
+    fullyBlockedDates,
   })
 }
 

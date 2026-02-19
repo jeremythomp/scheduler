@@ -6,9 +6,9 @@ import { Calendar as CalendarIcon, List } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppointmentsCalendar } from "./appointments-calendar"
 import { AppointmentsTable } from "./appointments-table"
-import { AppointmentDetailsSidebar } from "./appointment-details-sidebar"
+import { AppointmentDetailsSidebar, type DayBlockInfo } from "./appointment-details-sidebar"
 import { ServiceFilter } from "./service-filter"
-import { getServiceBookings } from "@/app/(staff)/actions"
+import { getServiceBookings, getActiveBlocks } from "@/app/(staff)/actions"
 import { toast } from "sonner"
 
 type ServiceBookingWithRequest = ServiceBooking & {
@@ -23,15 +23,18 @@ interface AppointmentsViewProps {
   initialBookings: ServiceBookingWithRequest[]
   serviceFilter?: string
   onServiceFilterChange?: (value: string) => void
+  refreshToken?: number
 }
 
 export function AppointmentsView({ 
   initialBookings, 
   serviceFilter: controlledServiceFilter,
-  onServiceFilterChange 
+  onServiceFilterChange,
+  refreshToken = 0,
 }: AppointmentsViewProps) {
   const [viewMode, setViewMode] = useState<"calendar" | "table">("calendar")
   const [internalServiceFilter, setInternalServiceFilter] = useState("all")
+  const [currentDate, setCurrentDate] = useState(new Date())
   
   // Use controlled or uncontrolled mode
   const serviceFilter = controlledServiceFilter ?? internalServiceFilter
@@ -39,13 +42,15 @@ export function AppointmentsView({
   const [selectedBooking, setSelectedBooking] = useState<ServiceBookingWithRequest | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [dayBookings, setDayBookings] = useState<ServiceBookingWithRequest[]>([])
+  const [selectedDayBlock, setSelectedDayBlock] = useState<DayBlockInfo | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [bookings, setBookings] = useState<ServiceBookingWithRequest[]>(initialBookings)
+  const [dayBlocks, setDayBlocks] = useState<DayBlockInfo[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  // Fetch bookings when filter changes
+  // Fetch bookings and day blocks when filter, displayed month, or refreshToken changes
   useEffect(() => {
-    const fetchBookings = async () => {
+    const fetchData = async () => {
       setIsLoading(true)
       try {
         const filters: any = {}
@@ -54,27 +59,41 @@ export function AppointmentsView({
           filters.serviceType = serviceFilter
         }
         
-        // For calendar view, fetch current month
+        let start: Date | undefined
+        let end: Date | undefined
         if (viewMode === "calendar") {
-          const now = new Date()
-          const start = new Date(now.getFullYear(), now.getMonth(), 1)
-          const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+          start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+          end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
           filters.startDate = start
           filters.endDate = end
         }
         
-        const data = await getServiceBookings(filters)
-        setBookings(data as ServiceBookingWithRequest[])
+        const [bookingsData, blocksData] = await Promise.all([
+          getServiceBookings(filters),
+          viewMode === "calendar" && start && end
+            ? getActiveBlocks(start.toISOString().split("T")[0], end.toISOString().split("T")[0])
+            : Promise.resolve([]),
+        ])
+        
+        setBookings(bookingsData as ServiceBookingWithRequest[])
+        setDayBlocks(
+          (blocksData as { date: Date; blockType: string; publicNote: string }[]).map((b) => ({
+            date: new Date(b.date).toISOString().split("T")[0],
+            blockType: b.blockType,
+            publicNote: b.publicNote,
+          }))
+        )
       } catch (error) {
         toast.error("Failed to load appointments")
         console.error(error)
+        setDayBlocks([])
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchBookings()
-  }, [serviceFilter, viewMode])
+    fetchData()
+  }, [serviceFilter, viewMode, currentDate, refreshToken])
 
   const filteredBookings = useMemo(() => {
     if (serviceFilter === "all") {
@@ -90,9 +109,10 @@ export function AppointmentsView({
     setSidebarOpen(true)
   }
 
-  const handleDayClick = (date: Date, bookingsForDay: ServiceBookingWithRequest[]) => {
+  const handleDayClick = (date: Date, bookingsForDay: ServiceBookingWithRequest[], dayBlock?: DayBlockInfo | null) => {
     setSelectedDate(date)
     setDayBookings(bookingsForDay)
+    setSelectedDayBlock(dayBlock ?? null)
     setSelectedBooking(null)
     setSidebarOpen(true)
   }
@@ -106,11 +126,10 @@ export function AppointmentsView({
         filters.serviceType = serviceFilter
       }
       
-      // For calendar view, fetch current month
+      // For calendar view, fetch the displayed month's data
       if (viewMode === "calendar") {
-        const now = new Date()
-        const start = new Date(now.getFullYear(), now.getMonth(), 1)
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+        const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
         filters.startDate = start
         filters.endDate = end
       }
@@ -123,6 +142,7 @@ export function AppointmentsView({
       setSelectedBooking(null)
       setSelectedDate(null)
       setDayBookings([])
+      setSelectedDayBlock(null)
     } catch (error) {
       console.error("Error refreshing bookings:", error)
     }
@@ -159,7 +179,10 @@ export function AppointmentsView({
         ) : viewMode === "calendar" ? (
           <AppointmentsCalendar
             bookings={filteredBookings}
+            dayBlocks={dayBlocks}
             onDayClick={handleDayClick}
+            currentDate={currentDate}
+            onMonthChange={setCurrentDate}
           />
         ) : (
           <AppointmentsTable
@@ -176,6 +199,7 @@ export function AppointmentsView({
         booking={selectedBooking}
         dayBookings={dayBookings}
         selectedDate={selectedDate || undefined}
+        selectedDayBlock={selectedDayBlock}
         onRescheduleSuccess={handleRescheduleSuccess}
       />
     </>

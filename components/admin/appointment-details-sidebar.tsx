@@ -23,12 +23,15 @@ type ServiceBookingWithRequest = ServiceBooking & {
   }
 }
 
+export type DayBlockInfo = { date: string; blockType: string; publicNote: string }
+
 interface AppointmentDetailsSidebarProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   booking: ServiceBookingWithRequest | null
   dayBookings?: ServiceBookingWithRequest[]
   selectedDate?: Date
+  selectedDayBlock?: DayBlockInfo | null
   onRescheduleSuccess?: () => void
 }
 
@@ -44,6 +47,7 @@ export function AppointmentDetailsSidebar({
   booking,
   dayBookings,
   selectedDate,
+  selectedDayBlock,
   onRescheduleSuccess
 }: AppointmentDetailsSidebarProps) {
   const [selectedBooking, setSelectedBooking] = useState<ServiceBookingWithRequest | null>(booking)
@@ -62,10 +66,11 @@ export function AppointmentDetailsSidebar({
     }
   }, [booking, dayBookings])
 
-  // If showing day list mode
+  // If showing day list mode (has bookings) or closed-day mode (blocked, possibly zero bookings)
   const showDayList = !booking && dayBookings && dayBookings.length > 0
+  const showClosedDay = !booking && selectedDate && selectedDayBlock
   
-  if (!booking && !showDayList) return null
+  if (!booking && !showDayList && !showClosedDay) return null
 
   const getInitials = (name: string) => {
     return name
@@ -207,9 +212,11 @@ export function AppointmentDetailsSidebar({
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto pl-6 pb-8">
         <SheetHeader>
           <SheetTitle>
-            {showDayList && !selectedBooking 
-              ? `Appointments - ${selectedDate?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
-              : "Appointment Details"}
+            {showClosedDay && !selectedBooking
+              ? `Day closed - ${selectedDate?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+              : showDayList && !selectedBooking 
+                ? `Appointments - ${selectedDate?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                : "Appointment Details"}
           </SheetTitle>
           {selectedBooking && dayBookings && (
             <Button
@@ -223,13 +230,33 @@ export function AppointmentDetailsSidebar({
           )}
         </SheetHeader>
 
-        {/* Day Appointments List View */}
-        {showDayList && !selectedBooking ? (
+        {/* Closed / cancelled day banner */}
+        {selectedDayBlock && (showDayList || showClosedDay) && !selectedBooking && (
+          <div className="mt-4 rounded-lg border-2 border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="min-w-0">
+                <p className="font-semibold text-amber-900 dark:text-amber-100">This day was closed/cancelled by staff.</p>
+                {selectedDayBlock.blockType === "full" && (
+                  <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">Full day block</p>
+                )}
+                {selectedDayBlock.publicNote?.trim() && (
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mt-2">{selectedDayBlock.publicNote}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Day Appointments List View (with or without bookings; closed-day may have zero) */}
+        {(showDayList || showClosedDay) && !selectedBooking ? (
           <div className="mt-6 space-y-3">
-            <p className="text-sm text-muted-foreground mb-4">
-              {dayBookings.length} appointment{dayBookings.length !== 1 ? 's' : ''} scheduled
-            </p>
-            {dayBookings.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)).map((dayBooking, idx) => (
+            {dayBookings && dayBookings.length > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {dayBookings.length} appointment{dayBookings.length !== 1 ? 's' : ''} scheduled
+                </p>
+                {dayBookings.sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)).map((dayBooking, idx) => (
               <button
                 key={idx}
                 onClick={() => setSelectedBooking(dayBooking)}
@@ -255,6 +282,10 @@ export function AppointmentDetailsSidebar({
                 </Badge>
               </button>
             ))}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No appointments scheduled for this day.</p>
+            )}
           </div>
         ) : displayBooking ? (
           <div className="mt-6 space-y-6">
@@ -295,7 +326,7 @@ export function AppointmentDetailsSidebar({
                   <div className="flex items-start gap-3">
                     <CreditCard className="h-4 w-4 mt-0.5 text-muted-foreground" />
                     <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">Customer ID</p>
+                      <p className="text-xs text-muted-foreground">Identification Number</p>
                       <p className="text-sm font-medium font-mono">{displayBooking.appointmentRequest.idNumber}</p>
                     </div>
                   </div>

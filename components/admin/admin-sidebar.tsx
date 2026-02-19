@@ -25,6 +25,7 @@ interface AdminSidebarProps {
     thisMonth: number
   }
   userRole?: string
+  onBlockSuccess?: () => void
 }
 
 const getNavItems = (userRole?: string) => {
@@ -53,7 +54,7 @@ const getNavItems = (userRole?: string) => {
   return items
 }
 
-export function AdminSidebar({ pendingCount = 0, todayStats, cancellationStats, userRole }: AdminSidebarProps) {
+export function AdminSidebar({ pendingCount = 0, todayStats, cancellationStats, userRole, onBlockSuccess }: AdminSidebarProps) {
   const pathname = usePathname()
   const navItems = getNavItems(userRole)
   const [blockDayDialogOpen, setBlockDayDialogOpen] = useState(false)
@@ -213,6 +214,7 @@ export function AdminSidebar({ pendingCount = 0, todayStats, cancellationStats, 
       <BlockDayDialog
         open={blockDayDialogOpen}
         onOpenChange={setBlockDayDialogOpen}
+        onSuccess={onBlockSuccess}
       />
     </aside>
   )

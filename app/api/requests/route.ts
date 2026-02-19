@@ -6,6 +6,7 @@ import { generateReferenceNumber } from "@/lib/reference-number"
 import { generateCancellationToken } from "@/lib/cancellation-token"
 import { createConfirmationEmailContent } from "@/lib/server/email"
 import { enqueueEmail } from "@/lib/server/email-queue"
+import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit"
 
 // Service capacity configuration
 const SERVICE_CAPACITY: Record<string, number> = {
@@ -140,12 +141,19 @@ function validateTimeConstraints(
 }
 
 export async function POST(request: Request) {
+  // 5 booking submissions per IP per 10 minutes
+  const ip = getClientIp(request)
+  const rl = checkRateLimit(`requests:${ip}`, { limit: 5, windowMs: 10 * 60 * 1000 })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please try again later." },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetAfterMs / 1000)) } }
+    )
+  }
+
   try {
     const body = await request.json()
     const validated = appointmentRequestSchema.parse(body)
-    
-    const referenceNumber = generateReferenceNumber()
-    const cancellationToken = generateCancellationToken()
     
     // Validate time constraints before transaction
     try {
@@ -157,88 +165,105 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
     
-    // Use transaction to create appointment with service bookings atomically
-    const result = await withRetry(async () => {
-      return await prisma.$transaction(async (tx) => {
-        // Validate capacity within transaction (with row-level locking)
-        await validateCapacity(validated.serviceBookings, tx)
-        
-        // Create the appointment request
-        const appointment = await tx.appointmentRequest.create({
-          data: {
-            customerName: validated.customerName,
-            customerEmail: validated.customerEmail,
-            customerPhone: validated.customerPhone,
-            companyName: validated.companyName,
-            numberOfVehicles: validated.numberOfVehicles,
-            idNumber: validated.idNumber,
-            servicesRequested: validated.servicesRequested,
-            additionalNotes: validated.additionalNotes,
-            referenceNumber,
-            cancellationToken,
-            status: "confirmed", // Auto-confirm
-          }
-        })
-        
-        // Create service bookings for each service
-        const serviceBookings = await Promise.all(
-          validated.serviceBookings.map((booking) =>
-            tx.serviceBooking.create({
-              data: {
-                appointmentRequestId: appointment.id,
-                serviceName: booking.serviceName,
-                scheduledDate: new Date(booking.scheduledDate),
-                scheduledTime: booking.scheduledTime,
-                location: booking.location,
-                vehicleCount: booking.vehicleCount || 1,
-              }
-            })
+    // Retry loop handles the rare case where a generated reference number collides
+    // with an existing one (P2002 unique constraint violation on referenceNumber).
+    const MAX_REF_RETRIES = 3
+    let result
+    for (let attempt = 0; attempt < MAX_REF_RETRIES; attempt++) {
+      const referenceNumber = generateReferenceNumber()
+      const cancellationToken = generateCancellationToken()
+
+      // Use transaction to create appointment with service bookings atomically
+      result = await withRetry(async () => {
+        return await prisma.$transaction(async (tx) => {
+          // Validate capacity within transaction (with row-level locking)
+          await validateCapacity(validated.serviceBookings, tx)
+          
+          // Create the appointment request
+          const appointment = await tx.appointmentRequest.create({
+            data: {
+              customerName: validated.customerName,
+              customerEmail: validated.customerEmail,
+              customerPhone: validated.customerPhone,
+              companyName: validated.companyName,
+              numberOfVehicles: validated.numberOfVehicles,
+              idNumber: validated.idNumber,
+              servicesRequested: validated.servicesRequested,
+              additionalNotes: validated.additionalNotes,
+              referenceNumber,
+              cancellationToken,
+              status: "confirmed",
+            }
+          })
+          
+          // Create service bookings for each service
+          const serviceBookings = await Promise.all(
+            validated.serviceBookings.map((booking) =>
+              tx.serviceBooking.create({
+                data: {
+                  appointmentRequestId: appointment.id,
+                  serviceName: booking.serviceName,
+                  scheduledDate: new Date(booking.scheduledDate),
+                  scheduledTime: booking.scheduledTime,
+                  location: booking.location,
+                  vehicleCount: booking.vehicleCount || 1,
+                }
+              })
+            )
           )
-        )
-        
-        return {
-          ...appointment,
-          serviceBookings
-        }
+          
+          return { ...appointment, serviceBookings }
+        })
       })
-    })
+
+      // If the only failure was a unique constraint on referenceNumber, regenerate and retry
+      if (
+        !result.success &&
+        result.errorType === 'unknown' &&
+        result.error?.includes('referenceNumber')
+      ) {
+        console.warn(`Reference number collision on attempt ${attempt + 1}, retrying...`)
+        continue
+      }
+      break
+    }
     
-    if (!result.success) {
-      console.error('Error creating appointment request:', result.error)
+    if (!result?.success) {
+      console.error('Error creating appointment request:', result?.error)
       
       // Check if it's a capacity validation error
-      if (result.error && result.error.includes('Insufficient capacity')) {
+      if (result?.error && result.error.includes('Insufficient capacity')) {
         return NextResponse.json({
           success: false,
           error: result.error,
           errorType: 'capacity'
-        }, { status: 409 }) // 409 Conflict for capacity issues
+        }, { status: 409 })
       }
       
       // Check if it's a time constraint validation error
-      if (result.error && result.error.includes('must be scheduled after')) {
+      if (result?.error && result.error.includes('must be scheduled after')) {
         return NextResponse.json({
           success: false,
           error: result.error,
           errorType: 'constraint'
-        }, { status: 400 }) // 400 Bad Request for constraint violations
+        }, { status: 400 })
       }
       
       // Return 503 for connection errors, 500 for other errors
-      const statusCode = result.errorType === 'connection' ? 503 : 500
+      const statusCode = result?.errorType === 'connection' ? 503 : 500
       
       return NextResponse.json({
         success: false,
-        error: result.error || "Failed to submit request",
-        errorType: result.errorType
+        error: result?.error || "Failed to submit request",
+        errorType: result?.errorType
       }, { status: statusCode })
     }
     
     // Send confirmation email asynchronously (don't block response)
-    const content = createConfirmationEmailContent(result.data!)
+    const content = createConfirmationEmailContent(result!.data!)
     enqueueEmail({
       type: 'confirmation',
-      to: result.data!.customerEmail,
+      to: result!.data!.customerEmail,
       ...content,
     }).catch(error => {
       console.error('Failed to enqueue confirmation email:', error)
@@ -246,8 +271,8 @@ export async function POST(request: Request) {
     
     return NextResponse.json({
       success: true,
-      referenceNumber,
-      appointment: result.data,
+      referenceNumber: result!.data!.referenceNumber,
+      appointment: result!.data,
       message: "Appointment confirmed successfully!"
     }, { status: 201 })
   } catch (error) {

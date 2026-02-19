@@ -1,5 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
+import { FeedbackForm } from "@/components/feedback/feedback-form"
 
 export function Footer() {
   return (
@@ -40,10 +41,19 @@ export function Footer() {
             </ul>
           </div>
         </div>
+
+        {/* Feedback Section */}
+        <div className="mb-12">
+          <h4 className="font-bold mb-3 text-white">Feedback</h4>
+          <p className="text-white/60 text-sm mb-3 max-w-md">
+            Found an issue or have a suggestion? Let us know.
+          </p>
+          <FeedbackForm source="public_footer" />
+        </div>
         
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-white/10 flex justify-center items-center text-xs text-white/40">
-          <p>© 2024 Barbados Licensing Authority. All rights reserved.</p>
+          <p>© 2026 Barbados Licensing Authority. All rights reserved.</p>
         </div>
       </div>
     </footer>

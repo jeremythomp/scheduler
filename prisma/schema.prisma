@@ -21,6 +21,7 @@ model StaffUser {
   updatedAt            DateTime              @updatedAt
   approvedRequests     AppointmentRequest[]  @relation("ApprovedBy")
   dayBlocks            DayBlock[]
+  auditLogs            AuditLog[]
 
   @@map("staff_users")
 }
@@ -49,6 +50,9 @@ model AppointmentRequest {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
+  @@index([customerEmail])
+  @@index([status])
+  @@index([createdAt])
   @@map("appointment_requests")
 }
 
@@ -64,6 +68,8 @@ model ServiceBooking {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
+  @@index([serviceName, scheduledDate, scheduledTime])
+  @@index([appointmentRequestId])
   @@map("service_bookings")
 }
 
@@ -102,5 +108,36 @@ model DayBlock {
   createdAt         DateTime           @default(now())
   cancellations     CancellationLog[]
 
+  @@index([date])
   @@map("day_blocks")
+}
+
+model AuditLog {
+  id          Int        @id @default(autoincrement())
+  action      String
+  staffId     Int
+  staffUser   StaffUser  @relation(fields: [staffId], references: [id])
+  staffName   String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([staffId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  message   String
+  source    String
+  path      String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([source])
+  @@map("feedback")
 }

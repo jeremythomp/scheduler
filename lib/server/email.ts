@@ -1,6 +1,20 @@
 import sgMail from '@sendgrid/mail'
 import type { AppointmentRequest } from '@prisma/client'
 
+/**
+ * Escapes HTML special characters to prevent injection in email bodies.
+ * Should be applied to every user-supplied value interpolated into HTML strings.
+ */
+function escapeHtml(value: string | null | undefined): string {
+  if (!value) return ''
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY)
@@ -84,10 +98,10 @@ export function createConfirmationEmailContent(
   
   const servicesHtml = request.serviceBookings && request.serviceBookings.length > 0
     ? request.serviceBookings.map(b => {
-        const locationText = b.location ? ` <span style="color: #6b7280;">at ${b.location}</span>` : ''
-        return `<li><strong>${b.serviceName}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })} at ${b.scheduledTime}</li>`
+        const locationText = b.location ? ` <span style="color: #6b7280;">at ${escapeHtml(b.location)}</span>` : ''
+        return `<li><strong>${escapeHtml(b.serviceName)}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })} at ${escapeHtml(b.scheduledTime)}</li>`
       }).join('')
-    : `<li>${request.servicesRequested.join(', ')}</li>`
+    : `<li>${escapeHtml(request.servicesRequested.join(', '))}</li>`
 
   return {
     subject: `Appointment Confirmed - ${request.referenceNumber}`,
@@ -113,15 +127,15 @@ Thank you,
 ${COMPANY_NAME}`,
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 28px;">✓ Appointment Confirmed</h1>
+        <h1 style="margin: 0; font-size: 28px;">&#10003; Appointment Confirmed</h1>
       </div>
       <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-        <p style="font-size: 16px; color: #374151;">Dear ${request.customerName},</p>
+        <p style="font-size: 16px; color: #374151;">Dear ${escapeHtml(request.customerName)},</p>
         <p style="font-size: 16px; color: #374151;">Your appointment has been confirmed!</p>
         
         <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 5px;">
           <p style="margin: 0; font-size: 14px; color: #1e40af;"><strong>Reference Number:</strong></p>
-          <p style="margin: 5px 0 0 0; font-size: 20px; color: #1e3a8a; font-family: monospace; font-weight: bold;">${request.referenceNumber}</p>
+          <p style="margin: 5px 0 0 0; font-size: 20px; color: #1e3a8a; font-family: monospace; font-weight: bold;">${escapeHtml(request.referenceNumber)}</p>
         </div>
         
         <h3 style="color: #1f2937; margin-top: 25px;">Scheduled Services:</h3>
@@ -139,7 +153,7 @@ ${COMPANY_NAME}`,
         
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         
-        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${COMPANY_NAME}</strong></p>
+        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${escapeHtml(COMPANY_NAME)}</strong></p>
       </div>
     </div>`
   }
@@ -170,18 +184,18 @@ Thank you,
 ${COMPANY_NAME}`,
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #22c55e;">Appointment Request Approved</h2>
-      <p>Dear ${request.customerName},</p>
+      <p>Dear ${escapeHtml(request.customerName)},</p>
       <p><strong>Good news!</strong> Your appointment request has been approved.</p>
       <h3>Appointment Details:</h3>
       <ul>
-        <li><strong>Reference Number:</strong> ${request.referenceNumber}</li>
-        <li><strong>Services:</strong> ${request.servicesRequested.join(', ')}</li>
-        ${request.preferredDate ? `<li><strong>Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${request.preferredTime}</li>` : ''}
+        <li><strong>Reference Number:</strong> ${escapeHtml(request.referenceNumber)}</li>
+        <li><strong>Services:</strong> ${escapeHtml(request.servicesRequested.join(', '))}</li>
+        ${request.preferredDate ? `<li><strong>Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${escapeHtml(request.preferredTime ?? '')}</li>` : ''}
       </ul>
-      ${request.staffNotes ? `<div style="background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;"><strong>Staff Notes:</strong><br/>${request.staffNotes}</div>` : ''}
+      ${request.staffNotes ? `<div style="background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 15px 0;"><strong>Staff Notes:</strong><br/>${escapeHtml(request.staffNotes)}</div>` : ''}
       <p>Please arrive 10 minutes before your scheduled time.</p>
       <p>If you need to cancel or reschedule, please contact us as soon as possible.</p>
-      <p>Thank you,<br/>${COMPANY_NAME}</p>
+      <p>Thank you,<br/>${escapeHtml(COMPANY_NAME)}</p>
     </div>`
   }
 }
@@ -209,17 +223,17 @@ Thank you for your understanding.
 ${COMPANY_NAME}`,
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2>Appointment Request Update</h2>
-      <p>Dear ${request.customerName},</p>
+      <p>Dear ${escapeHtml(request.customerName)},</p>
       <p>We regret to inform you that we are unable to accommodate your appointment request at this time.</p>
       <h3>Request Details:</h3>
       <ul>
-        <li><strong>Reference Number:</strong> ${request.referenceNumber}</li>
-        ${request.preferredDate ? `<li><strong>Requested Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${request.preferredTime}</li>` : ''}
+        <li><strong>Reference Number:</strong> ${escapeHtml(request.referenceNumber)}</li>
+        ${request.preferredDate ? `<li><strong>Requested Date/Time:</strong> ${new Date(request.preferredDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${escapeHtml(request.preferredTime ?? '')}</li>` : ''}
       </ul>
-      ${request.staffNotes ? `<div style="background: #fef2f2; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ef4444;"><strong>Reason:</strong><br/>${request.staffNotes}</div>` : ''}
+      ${request.staffNotes ? `<div style="background: #fef2f2; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ef4444;"><strong>Reason:</strong><br/>${escapeHtml(request.staffNotes)}</div>` : ''}
       <p>Please feel free to submit a new request with alternative dates, or contact us directly to discuss available options.</p>
       <p>Thank you for your understanding.</p>
-      <p>${COMPANY_NAME}</p>
+      <p>${escapeHtml(COMPANY_NAME)}</p>
     </div>`
   }
 }
@@ -285,8 +299,8 @@ export function createCancellationEmailContent(data: {
   }).join('\n- ')
   
   const servicesHtml = data.serviceBookings.map(b => {
-    const locationText = b.location ? ` <span style="color: #6b7280;">at ${b.location}</span>` : ''
-    return `<li><strong>${b.serviceName}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })} at ${b.scheduledTime}</li>`
+    const locationText = b.location ? ` <span style="color: #6b7280;">at ${escapeHtml(b.location)}</span>` : ''
+    return `<li><strong>${escapeHtml(b.serviceName)}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })} at ${escapeHtml(b.scheduledTime)}</li>`
   }).join('')
 
   return {
@@ -311,12 +325,12 @@ ${COMPANY_NAME}`,
         <h1 style="margin: 0; font-size: 28px;">Appointment Cancelled</h1>
       </div>
       <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-        <p style="font-size: 16px; color: #374151;">Dear ${data.customerName},</p>
+        <p style="font-size: 16px; color: #374151;">Dear ${escapeHtml(data.customerName)},</p>
         <p style="font-size: 16px; color: #374151;">Your appointment has been cancelled as requested.</p>
         
         <div style="background: #f3f4f6; border-left: 4px solid #6b7280; padding: 15px; margin: 20px 0; border-radius: 5px;">
           <p style="margin: 0; font-size: 14px; color: #4b5563;"><strong>Reference Number:</strong></p>
-          <p style="margin: 5px 0 0 0; font-size: 20px; color: #1f2937; font-family: monospace; font-weight: bold;">${data.referenceNumber}</p>
+          <p style="margin: 5px 0 0 0; font-size: 20px; color: #1f2937; font-family: monospace; font-weight: bold;">${escapeHtml(data.referenceNumber)}</p>
         </div>
         
         <h3 style="color: #1f2937; margin-top: 25px;">Cancelled Services:</h3>
@@ -334,7 +348,7 @@ ${COMPANY_NAME}`,
         
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         
-        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${COMPANY_NAME}</strong></p>
+        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${escapeHtml(COMPANY_NAME)}</strong></p>
       </div>
     </div>`
   }
@@ -394,10 +408,10 @@ Thank you,
 ${COMPANY_NAME}`,
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 28px;">Welcome to ${COMPANY_NAME}</h1>
+        <h1 style="margin: 0; font-size: 28px;">Welcome to ${escapeHtml(COMPANY_NAME)}</h1>
       </div>
       <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-        <p style="font-size: 16px; color: #374151;">Dear ${data.name},</p>
+        <p style="font-size: 16px; color: #374151;">Dear ${escapeHtml(data.name)},</p>
         <p style="font-size: 16px; color: #374151;">Your staff account has been created. Below are your login credentials:</p>
         
         <div style="background: #f3f4f6; padding: 20px; border-radius: 5px; margin: 20px 0;">
@@ -405,14 +419,14 @@ ${COMPANY_NAME}`,
           <p style="margin: 0 0 15px 0;"><a href="${loginUrl}" style="color: #3b82f6; text-decoration: none; font-weight: bold;">${loginUrl}</a></p>
           
           <p style="margin: 0 0 10px 0; color: #6b7280;"><strong>Email:</strong></p>
-          <p style="margin: 0 0 15px 0; font-family: monospace; color: #1f2937;">${data.email}</p>
+          <p style="margin: 0 0 15px 0; font-family: monospace; color: #1f2937;">${escapeHtml(data.email)}</p>
           
           <p style="margin: 0 0 10px 0; color: #6b7280;"><strong>Temporary Password:</strong></p>
-          <p style="margin: 0; font-family: monospace; font-size: 18px; color: #1f2937; background: #ffffff; padding: 10px; border-radius: 3px; border: 1px solid #d1d5db;">${data.temporaryPassword}</p>
+          <p style="margin: 0; font-family: monospace; font-size: 18px; color: #1f2937; background: #ffffff; padding: 10px; border-radius: 3px; border: 1px solid #d1d5db;">${escapeHtml(data.temporaryPassword)}</p>
         </div>
         
         <div style="background: #fef3c7; border: 1px solid #fbbf24; padding: 15px; margin: 25px 0; border-radius: 5px;">
-          <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold;">⚠️ IMPORTANT: Password Change Required</p>
+          <p style="margin: 0 0 10px 0; color: #92400e; font-weight: bold;">&#9888; IMPORTANT: Password Change Required</p>
           <p style="margin: 0; font-size: 14px; color: #92400e;">For security reasons, you will be required to change your password when you first log in.</p>
         </div>
         
@@ -422,7 +436,7 @@ ${COMPANY_NAME}`,
             <li>At least 6 characters</li>
             <li>One uppercase letter</li>
             <li>One number</li>
-            <li>One special character (!@#$%^&*...)</li>
+            <li>One special character (!@#$%^&amp;*...)</li>
           </ul>
         </div>
         
@@ -432,7 +446,7 @@ ${COMPANY_NAME}`,
         
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         
-        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${COMPANY_NAME}</strong></p>
+        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${escapeHtml(COMPANY_NAME)}</strong></p>
       </div>
     </div>`
   }
@@ -497,7 +511,7 @@ export function createReschedulingEmailContent(data: {
   const staffNotesHtml = data.staffNotes 
     ? `<div style="background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3b82f6;">
         <p style="margin: 0 0 10px 0; color: #1f2937; font-weight: bold;">Staff Notes:</p>
-        <p style="margin: 0; color: #4b5563;">${data.staffNotes}</p>
+        <p style="margin: 0; color: #4b5563;">${escapeHtml(data.staffNotes)}</p>
       </div>`
     : ''
 
@@ -530,29 +544,29 @@ Thank you,
 ${COMPANY_NAME}`,
     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="margin: 0; font-size: 28px;">📅 Appointment Rescheduled</h1>
+        <h1 style="margin: 0; font-size: 28px;">&#128197; Appointment Rescheduled</h1>
       </div>
       <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-        <p style="font-size: 16px; color: #374151;">Dear ${data.customerName},</p>
+        <p style="font-size: 16px; color: #374151;">Dear ${escapeHtml(data.customerName)},</p>
         <p style="font-size: 16px; color: #374151;">Your appointment has been rescheduled.</p>
         
         <div style="background: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 5px;">
           <p style="margin: 0; font-size: 14px; color: #1e40af;"><strong>Reference Number:</strong></p>
-          <p style="margin: 5px 0 0 0; font-size: 20px; color: #1e3a8a; font-family: monospace; font-weight: bold;">${data.referenceNumber}</p>
+          <p style="margin: 5px 0 0 0; font-size: 20px; color: #1e3a8a; font-family: monospace; font-weight: bold;">${escapeHtml(data.referenceNumber)}</p>
         </div>
         
         <div style="background: #fef2f2; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ef4444;">
           <p style="margin: 0 0 10px 0; color: #991b1b; font-weight: bold;">Previous Appointment:</p>
-          <p style="margin: 0; color: #7f1d1d;"><strong>Service:</strong> ${data.serviceName}</p>
+          <p style="margin: 0; color: #7f1d1d;"><strong>Service:</strong> ${escapeHtml(data.serviceName)}</p>
           <p style="margin: 5px 0 0 0; color: #7f1d1d;"><strong>Date:</strong> ${oldDateFormatted}</p>
-          <p style="margin: 5px 0 0 0; color: #7f1d1d;"><strong>Time:</strong> ${data.oldTime}</p>
+          <p style="margin: 5px 0 0 0; color: #7f1d1d;"><strong>Time:</strong> ${escapeHtml(data.oldTime)}</p>
         </div>
         
         <div style="background: #d1fae5; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #10b981;">
           <p style="margin: 0 0 10px 0; color: #065f46; font-weight: bold;">New Appointment:</p>
-          <p style="margin: 0; color: #064e3b;"><strong>Service:</strong> ${data.serviceName}</p>
+          <p style="margin: 0; color: #064e3b;"><strong>Service:</strong> ${escapeHtml(data.serviceName)}</p>
           <p style="margin: 5px 0 0 0; color: #064e3b;"><strong>Date:</strong> ${newDateFormatted}</p>
-          <p style="margin: 5px 0 0 0; color: #064e3b;"><strong>Time:</strong> ${data.newTime}</p>
+          <p style="margin: 5px 0 0 0; color: #064e3b;"><strong>Time:</strong> ${escapeHtml(data.newTime)}</p>
         </div>
         
         ${staffNotesHtml}
@@ -567,7 +581,7 @@ ${COMPANY_NAME}`,
         
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         
-        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${COMPANY_NAME}</strong></p>
+        <p style="font-size: 14px; color: #9ca3af; margin: 0;">Thank you,<br/><strong>${escapeHtml(COMPANY_NAME)}</strong></p>
       </div>
     </div>`
   }
@@ -614,8 +628,8 @@ export function createStaffCancellationEmailContent(data: {
   }).join('\n- ')
   
   const servicesHtml = data.serviceBookings.map(b => {
-    const locationText = b.location ? ` <span style="color: #6b7280;">at ${b.location}</span>` : ''
-    return `<li><strong>${b.serviceName}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })} at ${b.scheduledTime}</li>`
+    const locationText = b.location ? ` <span style="color: #6b7280;">at ${escapeHtml(b.location)}</span>` : ''
+    return `<li><strong>${escapeHtml(b.serviceName)}</strong>${locationText} - ${new Date(b.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })} at ${escapeHtml(b.scheduledTime)}</li>`
   }).join('')
 
   return {
@@ -647,12 +661,12 @@ ${COMPANY_NAME}`,
         <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">We apologize for the inconvenience</p>
       </div>
       <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
-        <p style="font-size: 16px; color: #374151;">Dear ${data.customerName},</p>
+        <p style="font-size: 16px; color: #374151;">Dear ${escapeHtml(data.customerName)},</p>
         <p style="font-size: 16px; color: #374151;">We sincerely apologize, but we must cancel your scheduled appointment due to unforeseen circumstances.</p>
         
         <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 5px;">
           <p style="margin: 0; font-size: 14px; color: #991b1b;"><strong>Reference Number:</strong></p>
-          <p style="margin: 5px 0 0 0; font-size: 20px; color: #7f1d1d; font-family: monospace; font-weight: bold;">${data.referenceNumber}</p>
+          <p style="margin: 5px 0 0 0; font-size: 20px; color: #7f1d1d; font-family: monospace; font-weight: bold;">${escapeHtml(data.referenceNumber)}</p>
         </div>
         
         <h3 style="color: #1f2937; margin-top: 25px;">Cancelled Services:</h3>
@@ -662,7 +676,7 @@ ${COMPANY_NAME}`,
         
         <div style="background: #fff7ed; border: 2px solid #fb923c; padding: 20px; margin: 25px 0; border-radius: 8px;">
           <p style="margin: 0 0 10px 0; color: #9a3412; font-weight: bold; font-size: 16px;">Reason for Cancellation:</p>
-          <p style="margin: 0; color: #9a3412; font-size: 15px; line-height: 1.6;">${data.publicNote}</p>
+          <p style="margin: 0; color: #9a3412; font-size: 15px; line-height: 1.6;">${escapeHtml(data.publicNote)}</p>
         </div>
         
         <p style="font-size: 15px; color: #4b5563; margin: 25px 0;">We deeply regret any inconvenience this may cause. We would be grateful for the opportunity to serve you at another time.</p>
@@ -676,7 +690,7 @@ ${COMPANY_NAME}`,
         
         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
         
-        <p style="font-size: 14px; color: #9ca3af; margin: 0; text-align: center;">Sincerely,<br/><strong>${COMPANY_NAME}</strong></p>
+        <p style="font-size: 14px; color: #9ca3af; margin: 0; text-align: center;">Sincerely,<br/><strong>${escapeHtml(COMPANY_NAME)}</strong></p>
       </div>
     </div>`
   }

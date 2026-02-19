@@ -2,31 +2,34 @@ import Redis from 'ioredis'
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379'
 
-/**
- * Shared Redis connection factory
- * Creates a single connection that can be reused across the application
- */
-export function createRedisConnection(): Redis {
-  const redis = new Redis(REDIS_URL, {
+declare global {
+  // eslint-disable-next-line no-var
+  var __redis: Redis | undefined
+}
+
+function createRedisClient(): Redis {
+  const client = new Redis(REDIS_URL, {
     maxRetriesPerRequest: 3,
     enableReadyCheck: true,
     retryStrategy(times) {
-      const delay = Math.min(times * 50, 2000)
-      return delay
+      return Math.min(times * 50, 2000)
     },
   })
 
-  redis.on('connect', () => {
-    console.log('Redis connected successfully')
-  })
+  client.on('connect', () => console.log('Redis connected'))
+  client.on('error', (err) => console.error('Redis error:', err))
+  client.on('close', () => console.log('Redis connection closed'))
 
-  redis.on('error', (error) => {
-    console.error('Redis connection error:', error)
-  })
+  return client
+}
 
-  redis.on('close', () => {
-    console.log('Redis connection closed')
-  })
+/**
+ * Singleton Redis client — reused across hot reloads in development
+ * and shared across all server-side code in production.
+ */
+export const redis: Redis =
+  globalThis.__redis ?? (globalThis.__redis = createRedisClient())
 
-  return redis
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.__redis = redis
 }

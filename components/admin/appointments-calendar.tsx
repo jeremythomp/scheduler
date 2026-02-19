@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { ServiceBooking, AppointmentRequest } from "@prisma/client"
 import { ChevronLeft, ChevronRight, Car } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,9 +18,14 @@ type ServiceBookingWithRequest = ServiceBooking & {
   }
 }
 
+type DayBlockInfo = { date: string; blockType: string; publicNote: string }
+
 interface AppointmentsCalendarProps {
   bookings: ServiceBookingWithRequest[]
-  onDayClick: (date: Date, bookings: ServiceBookingWithRequest[]) => void
+  dayBlocks?: DayBlockInfo[]
+  onDayClick: (date: Date, bookings: ServiceBookingWithRequest[], dayBlock?: DayBlockInfo | null) => void
+  currentDate: Date
+  onMonthChange: (date: Date) => void
 }
 
 interface CalendarDay {
@@ -29,6 +34,7 @@ interface CalendarDay {
   isCurrentMonth: boolean
   isToday: boolean
   bookings: ServiceBookingWithRequest[]
+  dayBlock?: DayBlockInfo | null
 }
 
 const serviceColors: Record<string, string> = {
@@ -37,9 +43,7 @@ const serviceColors: Record<string, string> = {
   "Vehicle Registration/Customer Service Center": "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700"
 }
 
-export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date())
-
+export function AppointmentsCalendar({ bookings, dayBlocks = [], onDayClick, currentDate, onMonthChange }: AppointmentsCalendarProps) {
   const calendar = useMemo(() => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
@@ -68,18 +72,20 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
         const bookingDateStr = bookingDate.toISOString().split('T')[0]
         return bookingDateStr === dateStr
       })
+      const blockForDate = dayBlocks.find((b) => b.date === dateStr && b.blockType === "full") ?? null
 
       days.push({
         date: new Date(date),
         day: date.getDate(),
         isCurrentMonth: date.getMonth() === month,
         isToday: date.toISOString().split('T')[0] === today.toISOString().split('T')[0],
-        bookings: dayBookings
+        bookings: dayBookings,
+        dayBlock: blockForDate,
       })
     }
 
     return days
-  }, [currentDate, bookings])
+  }, [currentDate, bookings, dayBlocks])
 
   const monthName = currentDate.toLocaleDateString("en-US", {
     month: "long",
@@ -87,23 +93,19 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
   })
 
   const goToPreviousMonth = () => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev)
-      newDate.setMonth(newDate.getMonth() - 1)
-      return newDate
-    })
+    const newDate = new Date(currentDate)
+    newDate.setMonth(newDate.getMonth() - 1)
+    onMonthChange(newDate)
   }
 
   const goToNextMonth = () => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev)
-      newDate.setMonth(newDate.getMonth() + 1)
-      return newDate
-    })
+    const newDate = new Date(currentDate)
+    newDate.setMonth(newDate.getMonth() + 1)
+    onMonthChange(newDate)
   }
 
   const goToToday = () => {
-    setCurrentDate(new Date())
+    onMonthChange(new Date())
   }
 
   return (
@@ -153,20 +155,26 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
           ))}
 
           {/* Calendar days */}
-          {calendar.map((day, idx) => (
+          {calendar.map((day, idx) => {
+            const isFullyBlocked = day.dayBlock != null
+            const isClickable = day.bookings.length > 0 || isFullyBlocked
+            return (
             <button
               key={idx}
-              onClick={() => day.bookings.length > 0 && onDayClick(day.date, day.bookings)}
-              disabled={day.bookings.length === 0}
+              onClick={() => isClickable && onDayClick(day.date, day.bookings, day.dayBlock)}
+              disabled={!isClickable}
               className={cn(
-                "bg-card min-h-[120px] p-3 relative transition-all text-left",
+                "bg-card min-h-[120px] p-3 relative transition-all text-left overflow-hidden",
                 !day.isCurrentMonth && "bg-muted/30 text-muted-foreground",
                 day.isToday && "ring-2 ring-primary ring-inset",
-                day.bookings.length > 0 && "hover:bg-muted/50 cursor-pointer",
-                day.bookings.length === 0 && "cursor-default"
+                isClickable && "hover:bg-muted/50 cursor-pointer",
+                !isClickable && "cursor-default"
               )}
             >
-              <div className="flex items-start justify-between">
+              {isFullyBlocked && (
+                <div className="absolute inset-0 bg-red-500/20 ring-1 ring-red-400/30 pointer-events-none z-0" aria-hidden />
+              )}
+              <div className="relative z-10 flex items-start justify-between">
                 <span
                   className={cn(
                     "text-sm font-medium",
@@ -205,7 +213,7 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
 
               {/* Service type indicators */}
               {day.bookings.length > 0 && (
-                <div className="absolute bottom-2 left-2 flex gap-1">
+                <div className="absolute bottom-2 left-2 flex gap-1 z-10">
                   {Array.from(new Set(day.bookings.map(b => b.serviceName))).map((serviceName, i) => (
                     <div
                       key={i}
@@ -221,7 +229,7 @@ export function AppointmentsCalendar({ bookings, onDayClick }: AppointmentsCalen
                 </div>
               )}
             </button>
-          ))}
+          )})}
         </div>
       </CardContent>
     </Card>

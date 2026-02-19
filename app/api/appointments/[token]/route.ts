@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/server/prisma"
+import { withRetry } from "@/lib/server/db-utils"
 
 export async function GET(
   request: Request,
@@ -9,12 +10,22 @@ export async function GET(
     const { token } = await params
     
     // Find appointment by cancellation token
-    const appointment = await prisma.appointmentRequest.findUnique({
-      where: { cancellationToken: token },
-      include: {
-        serviceBookings: true,
-      }
-    })
+    const result = await withRetry(() =>
+      prisma.appointmentRequest.findUnique({
+        where: { cancellationToken: token },
+        include: { serviceBookings: true },
+      })
+    )
+
+    if (!result.success) {
+      const statusCode = result.errorType === 'connection' ? 503 : 500
+      return NextResponse.json(
+        { success: false, error: result.error ?? "Failed to fetch appointment" },
+        { status: statusCode }
+      )
+    }
+
+    const appointment = result.data
     
     if (!appointment) {
       return NextResponse.json({

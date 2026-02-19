@@ -1,5 +1,6 @@
 "use server"
 
+import crypto from "crypto"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/server/prisma"
 import { Prisma } from "@prisma/client"
@@ -7,38 +8,54 @@ import { withRetry } from "@/lib/server/db-utils"
 import { revalidatePath } from "next/cache"
 import { sendApprovalEmail, sendDenialEmail, sendWelcomeEmail, sendReschedulingEmail, sendStaffCancellationEmail, createApprovalEmailContent, createDenialEmailContent, createWelcomeEmailContent, createReschedulingEmailContent, createStaffCancellationEmailContent } from "@/lib/server/email"
 import { enqueueEmail } from "@/lib/server/email-queue"
+import { logAudit } from "@/lib/server/audit"
 
-// Helper function to generate a secure temporary password
+// Helper function to generate a secure temporary password using crypto
 function generateTemporaryPassword(): string {
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   const lowercase = 'abcdefghijklmnopqrstuvwxyz'
   const numbers = '0123456789'
   const specials = '!@#$%^&*'
-  
-  // Ensure at least one of each required character type
-  let password = ''
-  password += uppercase[Math.floor(Math.random() * uppercase.length)]
-  password += numbers[Math.floor(Math.random() * numbers.length)]
-  password += specials[Math.floor(Math.random() * specials.length)]
-  
-  // Fill the rest with random characters from all sets
   const allChars = uppercase + lowercase + numbers + specials
-  for (let i = 0; i < 9; i++) {
-    password += allChars[Math.floor(Math.random() * allChars.length)]
+
+  function securePickFrom(charset: string): string {
+    return charset[crypto.randomInt(charset.length)]
   }
-  
-  // Shuffle the password to randomize character positions
-  return password.split('').sort(() => Math.random() - 0.5).join('')
+
+  // Guarantee one of each required character class
+  const required = [
+    securePickFrom(uppercase),
+    securePickFrom(numbers),
+    securePickFrom(specials),
+  ]
+
+  // Fill remaining characters
+  const rest = Array.from({ length: 9 }, () => securePickFrom(allChars))
+
+  // Fisher-Yates shuffle using crypto for unbiased randomness
+  const chars = [...required, ...rest]
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1)
+    ;[chars[i], chars[j]] = [chars[j], chars[i]]
+  }
+
+  return chars.join('')
 }
 
 export async function getRequests(filters?: {
   status?: string
   search?: string
+  page?: number
+  pageSize?: number
 }) {
   const session = await auth()
   if (!session) throw new Error("Unauthorized")
+
+  const page = Math.max(1, filters?.page ?? 1)
+  const pageSize = Math.min(200, Math.max(1, filters?.pageSize ?? 100))
+  const skip = (page - 1) * pageSize
   
-  const where: any = {}
+  const where: Prisma.AppointmentRequestWhereInput = {}
   
   if (filters?.status && filters.status !== "all") {
     where.status = filters.status
@@ -48,25 +65,27 @@ export async function getRequests(filters?: {
     where.OR = [
       { customerName: { contains: filters.search, mode: "insensitive" } },
       { customerPhone: { contains: filters.search } },
-      { licensePlate: { contains: filters.search, mode: "insensitive" } },
-      { referenceNumber: { contains: filters.search, mode: "insensitive" } }
+      { referenceNumber: { contains: filters.search, mode: "insensitive" } },
+      { customerEmail: { contains: filters.search, mode: "insensitive" } },
     ]
   }
   
   const result = await withRetry(async () => {
-    return await prisma.appointmentRequest.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: { 
-        approvedByUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+    const [data, total] = await prisma.$transaction([
+      prisma.appointmentRequest.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+        include: { 
+          approvedByUser: {
+            select: { id: true, name: true, email: true }
           }
         }
-      }
-    })
+      }),
+      prisma.appointmentRequest.count({ where }),
+    ])
+    return { data, total }
   })
   
   if (!result.success) {
@@ -131,6 +150,19 @@ export async function approveRequest(id: number, staffNotes?: string) {
   }).catch(error => {
     console.error('Failed to enqueue approval email:', error)
   })
+
+  logAudit({
+    action: "appointment_approved",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "appointment",
+    targetId: result.data!.referenceNumber,
+    metadata: {
+      referenceNumber: result.data!.referenceNumber,
+      customerName: result.data!.customerName,
+      staffNotes: staffNotes || null,
+    },
+  })
   
   revalidatePath("/dashboard")
   
@@ -165,6 +197,19 @@ export async function denyRequest(id: number, staffNotes?: string) {
     ...content,
   }).catch(error => {
     console.error('Failed to enqueue denial email:', error)
+  })
+
+  logAudit({
+    action: "appointment_denied",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "appointment",
+    targetId: result.data!.referenceNumber,
+    metadata: {
+      referenceNumber: result.data!.referenceNumber,
+      customerName: result.data!.customerName,
+      staffNotes: staffNotes || null,
+    },
   })
   
   revalidatePath("/dashboard")
@@ -339,6 +384,19 @@ export async function createUser(data: {
   }).catch(error => {
     console.error('Failed to enqueue welcome email:', error)
   })
+
+  logAudit({
+    action: "user_created",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "user",
+    targetId: String(result.data!.id),
+    metadata: {
+      name: data.name,
+      email: data.email,
+      role: data.role,
+    },
+  })
   
   revalidatePath("/adminDashboard/users")
   
@@ -389,6 +447,21 @@ export async function updateUser(
   if (!result.success) {
     throw new Error(result.error || "Failed to update user")
   }
+
+  const changedFields: Record<string, unknown> = {}
+  if (data.name !== undefined) changedFields.name = data.name
+  if (data.email !== undefined) changedFields.email = data.email
+  if (data.role !== undefined) changedFields.role = data.role
+  if (data.password !== undefined) changedFields.passwordChanged = true
+
+  logAudit({
+    action: "user_updated",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "user",
+    targetId: String(id),
+    metadata: changedFields,
+  })
   
   revalidatePath("/adminDashboard/users")
   
@@ -405,6 +478,14 @@ export async function deleteUser(id: number) {
   if (parseInt(session.user.id) === id) {
     throw new Error("Cannot delete your own account")
   }
+
+  // Fetch the user before deletion for audit snapshot
+  const targetUserResult = await withRetry(async () => {
+    return await prisma.staffUser.findUnique({
+      where: { id },
+      select: { name: true, email: true, role: true },
+    })
+  })
   
   const result = await withRetry(async () => {
     return await prisma.staffUser.delete({
@@ -415,6 +496,19 @@ export async function deleteUser(id: number) {
   if (!result.success) {
     throw new Error(result.error || "Failed to delete user")
   }
+
+  logAudit({
+    action: "user_deleted",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "user",
+    targetId: String(id),
+    metadata: {
+      name: targetUserResult.data?.name ?? null,
+      email: targetUserResult.data?.email ?? null,
+      role: targetUserResult.data?.role ?? null,
+    },
+  })
   
   revalidatePath("/adminDashboard/users")
   
@@ -455,6 +549,18 @@ export async function checkInAppointment(appointmentId: number) {
   if (!result.success) {
     throw new Error(result.error || "Failed to check in appointment")
   }
+
+  logAudit({
+    action: "appointment_checked_in",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "appointment",
+    targetId: result.data!.referenceNumber,
+    metadata: {
+      referenceNumber: result.data!.referenceNumber,
+      customerName: result.data!.customerName,
+    },
+  })
   
   revalidatePath("/adminDashboard")
   
@@ -530,6 +636,18 @@ export async function markNoShow(appointmentId: number) {
   if (!updateResult.success) {
     throw new Error(updateResult.error || "Failed to mark appointment as no-show")
   }
+
+  logAudit({
+    action: "appointment_no_show",
+    staffId: userId,
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "appointment",
+    targetId: appointment.referenceNumber,
+    metadata: {
+      referenceNumber: appointment.referenceNumber,
+      customerName: appointment.customerName,
+    },
+  })
   
   revalidatePath("/adminDashboard")
   
@@ -738,6 +856,22 @@ export async function shiftBookingToSlot(
   }).catch(error => {
     console.error('Failed to enqueue rescheduling email:', error)
   })
+
+  logAudit({
+    action: "booking_shifted",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "booking",
+    targetId: String(bookingId),
+    metadata: {
+      referenceNumber: booking.appointmentRequest.referenceNumber,
+      customerName: booking.appointmentRequest.customerName,
+      serviceName,
+      date: dateStr,
+      oldTime,
+      newTime,
+    },
+  })
   
   revalidatePath("/adminDashboard")
   revalidatePath("/dashboard")
@@ -883,7 +1017,7 @@ export async function blockDay(data: {
   }
   
   // Send cancellation emails asynchronously
-  const { cancelledAppointments } = result.data!
+  const { cancelledAppointments, dayBlock, cancelledCount } = result.data!
   for (const appointment of cancelledAppointments) {
     const content = createStaffCancellationEmailContent({
       customerName: appointment.customerName,
@@ -899,6 +1033,20 @@ export async function blockDay(data: {
       console.error('Failed to enqueue staff cancellation email:', error)
     })
   }
+
+  logAudit({
+    action: "day_blocked",
+    staffId: userId,
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "day_block",
+    targetId: String(dayBlock.id),
+    metadata: {
+      date: data.date,
+      blockType: data.blockType,
+      reason: data.reason,
+      cancelledCount,
+    },
+  })
   
   revalidatePath("/adminDashboard")
   revalidatePath("/")
@@ -1090,6 +1238,23 @@ export async function rescheduleServiceBooking(data: {
   }).catch(error => {
     console.error('Failed to enqueue rescheduling email:', error)
   })
+
+  logAudit({
+    action: "booking_rescheduled",
+    staffId: parseInt(session.user.id!),
+    staffName: session.user.name || session.user.email || "Unknown",
+    targetType: "booking",
+    targetId: String(data.bookingId),
+    metadata: {
+      referenceNumber: booking.appointmentRequest.referenceNumber,
+      customerName: booking.appointmentRequest.customerName,
+      serviceName,
+      oldDate: oldDate.toISOString().split("T")[0],
+      oldTime,
+      newDate: data.newDate,
+      newTime: data.newTime,
+    },
+  })
   
   revalidatePath("/adminDashboard")
   revalidatePath("/dashboard")
@@ -1168,6 +1333,14 @@ export async function changePassword(data: {
   if (!updateResult.success) {
     throw new Error(updateResult.error || "Failed to update password")
   }
+
+  logAudit({
+    action: "password_changed",
+    staffId: userId,
+    staffName: updateResult.data!.name || updateResult.data!.email || "Unknown",
+    targetType: "user",
+    targetId: String(userId),
+  })
   
   return { success: true }
 }
@@ -1380,4 +1553,64 @@ export async function getCompaniesReport(filters?: {
   return result.data!
 }
 
+// ============================================================================
+// Audit Log
+// ============================================================================
 
+export type AuditLogRow = {
+  id: number
+  action: string
+  staffName: string
+  targetType: string | null
+  targetId: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: Date
+}
+
+export async function getAuditLogs(filters?: {
+  startDate?: Date
+  endDate?: Date
+  staffName?: string
+}) {
+  const session = await auth()
+  if (!session?.user || session.user.role !== "admin") {
+    throw new Error("Unauthorized: Admin access required")
+  }
+
+  const where: Prisma.AuditLogWhereInput = {}
+
+  if (filters?.startDate || filters?.endDate) {
+    where.createdAt = {}
+    if (filters.startDate) where.createdAt.gte = filters.startDate
+    if (filters.endDate) {
+      // Include the full end day
+      const endOfDay = new Date(filters.endDate)
+      endOfDay.setHours(23, 59, 59, 999)
+      where.createdAt.lte = endOfDay
+    }
+  }
+
+  if (filters?.staffName?.trim()) {
+    where.staffName = { contains: filters.staffName.trim(), mode: "insensitive" }
+  }
+
+  const result = await withRetry(async () => {
+    return await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        action: true,
+        staffName: true,
+        targetType: true,
+        targetId: true,
+        metadata: true,
+        createdAt: true,
+      },
+    })
+  })
+
+  if (!result.success) throw new Error(result.error || "Database temporarily unavailable")
+
+  return result.data! as AuditLogRow[]
+}

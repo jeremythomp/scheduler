@@ -1,6 +1,7 @@
 "use client"
 
-import { Download } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Download, ChevronLeft, ChevronRight } from "lucide-react"
 import type { CompanyReportRow } from "@/app/(staff)/actions"
 
 import { Button } from "@/components/ui/button"
@@ -14,12 +15,24 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+const PAGE_SIZE = 10
+
 export interface CompaniesReportTableProps {
   data: CompanyReportRow[]
   onExportCSV?: () => void
 }
 
 export function CompaniesReportTable({ data, onExportCSV }: CompaniesReportTableProps) {
+  const [page, setPage] = useState(1)
+
+  // Reset to page 1 whenever the data changes (filter update)
+  useEffect(() => {
+    setPage(1)
+  }, [data])
+
+  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
+  const pageRows = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   return (
     <Card className="overflow-hidden">
       <div className="p-6 border-b border-border flex justify-between items-center">
@@ -67,7 +80,7 @@ export function CompaniesReportTable({ data, onExportCSV }: CompaniesReportTable
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row) => (
+              pageRows.map((row) => (
                 <TableRow key={row.companyName} className="transition-colors">
                   <TableCell className="px-6 py-4 font-medium text-foreground">
                     {row.companyName}
@@ -87,6 +100,38 @@ export function CompaniesReportTable({ data, onExportCSV }: CompaniesReportTable
           </TableBody>
         </Table>
       </div>
+      {totalPages > 1 && (
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-4">
+          <span className="text-sm text-muted-foreground">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data.length)} of {data.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="sr-only">Previous page</span>
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Next page</span>
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

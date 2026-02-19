@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/server/prisma"
+import { withRetry } from "@/lib/server/db-utils"
 import { createCancellationEmailContent } from "@/lib/server/email"
 import { enqueueEmail } from "@/lib/server/email-queue"
+import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit"
 
 export async function POST(request: Request) {
+  // 10 cancellation attempts per IP per 10 minutes
+  const ip = getClientIp(request)
+  const rl = checkRateLimit(`cancel:${ip}`, { limit: 10, windowMs: 10 * 60 * 1000 })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please try again later." },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetAfterMs / 1000)) } }
+    )
+  }
+
   try {
     const body = await request.json()
     const { appointmentId, reason, cancelledVia } = body
@@ -22,21 +34,27 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
     
-    // Get client IP for audit trail
-    const forwarded = request.headers.get('x-forwarded-for')
-    const ipAddress = forwarded ? forwarded.split(',')[0] : 
-                     request.headers.get('x-real-ip') || 
-                     'unknown'
-    
+    // ip is already extracted above for rate limiting; reuse for the audit trail
+    const ipAddress = ip
+
     // Fetch the appointment with service bookings
-    const appointment = await prisma.appointmentRequest.findUnique({
-      where: { id: appointmentId },
-      include: {
-        serviceBookings: true,
-        cancellation: true,
-      }
-    })
-    
+    const fetchResult = await withRetry(() =>
+      prisma.appointmentRequest.findUnique({
+        where: { id: appointmentId },
+        include: { serviceBookings: true, cancellation: true },
+      })
+    )
+
+    if (!fetchResult.success) {
+      const statusCode = fetchResult.errorType === 'connection' ? 503 : 500
+      return NextResponse.json(
+        { success: false, error: fetchResult.error ?? "Failed to fetch appointment" },
+        { status: statusCode }
+      )
+    }
+
+    const appointment = fetchResult.data
+
     if (!appointment) {
       return NextResponse.json({
         success: false,
@@ -62,35 +80,43 @@ export async function POST(request: Request) {
     }
     
     // Execute cancellation in a transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Update appointment status
-      const updatedAppointment = await tx.appointmentRequest.update({
-        where: { id: appointmentId },
-        data: { status: 'cancelled' }
+    const cancelResult = await withRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const updatedAppointment = await tx.appointmentRequest.update({
+          where: { id: appointmentId },
+          data: { status: 'cancelled' }
+        })
+        
+        const scheduledDates = appointment.serviceBookings.map(booking => 
+          `${booking.serviceName}: ${new Date(booking.scheduledDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.scheduledTime}`
+        )
+        
+        const cancellationLog = await tx.cancellationLog.create({
+          data: {
+            appointmentRequestId: appointmentId,
+            referenceNumber: appointment.referenceNumber,
+            customerName: appointment.customerName,
+            customerEmail: appointment.customerEmail,
+            servicesRequested: appointment.servicesRequested,
+            scheduledDates,
+            reason: reason || null,
+            cancelledVia,
+            ipAddress,
+          }
+        })
+        
+        return { updatedAppointment, cancellationLog }
       })
-      
-      // Create snapshot of service bookings
-      const scheduledDates = appointment.serviceBookings.map(booking => 
-        `${booking.serviceName}: ${new Date(booking.scheduledDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} at ${booking.scheduledTime}`
+    )
+
+    if (!cancelResult.success) {
+      console.error('Error cancelling appointment:', cancelResult.error)
+      const statusCode = cancelResult.errorType === 'connection' ? 503 : 500
+      return NextResponse.json(
+        { success: false, error: cancelResult.error ?? "Failed to cancel appointment" },
+        { status: statusCode }
       )
-      
-      // Create cancellation log with snapshot
-      const cancellationLog = await tx.cancellationLog.create({
-        data: {
-          appointmentRequestId: appointmentId,
-          referenceNumber: appointment.referenceNumber,
-          customerName: appointment.customerName,
-          customerEmail: appointment.customerEmail,
-          servicesRequested: appointment.servicesRequested,
-          scheduledDates,
-          reason: reason || null,
-          cancelledVia,
-          ipAddress,
-        }
-      })
-      
-      return { updatedAppointment, cancellationLog }
-    })
+    }
     
     // Send cancellation confirmation email asynchronously
     const content = createCancellationEmailContent({

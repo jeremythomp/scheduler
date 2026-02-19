@@ -18,7 +18,7 @@ export const appointmentRequestSchema = z.object({
   customerPhone: z.string().optional(),
   companyName: z.string().optional(),
   numberOfVehicles: z.number().int().min(1, "At least 1 vehicle required"),
-  idNumber: z.string().optional().refine((val) => !val || /^\d{10}$/.test(val), "ID number must be exactly 10 digits if provided"),
+  idNumber: z.string().optional(),
   servicesRequested: z.array(z.string()).min(1, "At least one service must be selected"),
   serviceBookings: z.array(serviceBookingSchema).min(1, "At least one service booking is required"),
   additionalNotes: z.string().optional()
@@ -33,7 +33,7 @@ export const bookingFormSchema = z.object({
   email: z.string().email("Invalid email address"),
   companyName: z.string().optional(),
   numberOfVehicles: z.number().int().min(1, "At least 1 vehicle required"),
-  idNumber: z.string().optional().refine((val) => !val || /^\d{10}$/.test(val), "ID number must be exactly 10 digits if provided"),
+  idNumber: z.string().optional(),
 })
 
 export type BookingFormInput = z.infer<typeof bookingFormSchema>
@@ -61,3 +61,16 @@ export function checkPasswordRequirements(password: string) {
     hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   }
 }
+
+// Schema for footer feedback form
+export const feedbackSchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(5, "Please enter at least 5 characters")
+    .max(2000, "Feedback must be 2000 characters or less"),
+  source: z.enum(["public_footer", "admin_footer"]),
+  path: z.string().optional(),
+})
+
+export type FeedbackInput = z.infer<typeof feedbackSchema>

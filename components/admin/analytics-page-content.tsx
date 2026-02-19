@@ -16,7 +16,13 @@ import { AnalyticsHeader } from "./analytics-header"
 import { StatCard } from "./stat-card"
 import { CompaniesReportTable } from "./companies-report-table"
 import { CancellationsReportTable } from "./cancellations-report-table"
+import dynamic from "next/dynamic"
 import { Card } from "@/components/ui/card"
+
+const AuditReportDialog = dynamic(
+  () => import("./audit-report-dialog").then((m) => ({ default: m.AuditReportDialog })),
+  { ssr: false }
+)
 
 function getDefaultDateRange(): DateRange | undefined {
   const now = new Date()
@@ -38,6 +44,7 @@ export function AnalyticsPageContent({
   initialCompanies,
   initialCancellations,
   cancellationStats,
+  userRole,
 }: AnalyticsPageContentProps) {
   const [serviceFilter, setServiceFilter] = useState("all")
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange())
@@ -140,7 +147,7 @@ export function AnalyticsPageContent({
 
   return (
     <div className="space-y-6">
-      <Card className="p-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <Card className="p-6 flex flex-col gap-4">
         <AnalyticsHeader
           serviceFilter={serviceFilter}
           onServiceFilterChange={handleServiceChange}
@@ -149,6 +156,11 @@ export function AnalyticsPageContent({
           onExportCSV={exportAllCSV}
           onExportPDF={exportPDF}
         />
+        {userRole === "admin" && (
+          <div className="flex justify-end border-t border-border pt-4">
+            <AuditReportDialog />
+          </div>
+        )}
       </Card>
 
       {isPending && (

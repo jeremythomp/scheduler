@@ -11,7 +11,7 @@ export default async function DashboardPage() {
   }
 
   // Fetch requests with error handling - errors will be caught by error boundary
-  const requests = await getRequests()
+  const { data: requests } = await getRequests()
 
   return (
     <div className="min-h-screen bg-gray-50">

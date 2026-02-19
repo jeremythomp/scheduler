@@ -161,12 +161,12 @@ export function SchedulingForm() {
           {/* Company Name */}
           <div className="space-y-1.5">
             <Label htmlFor="company-name" className="block text-sm font-bold pl-1">
-              Company Name <span className="text-muted-foreground font-normal">(Optional)</span>
+              Company / Organisation <span className="text-muted-foreground font-normal">(Optional)</span>
             </Label>
             <Input
               id="company-name"
               type="text"
-              placeholder="ABC Company Ltd"
+              placeholder="ABC Company Ltd / Ministry of Finance"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="rounded-2xl bg-muted border-0 py-6 px-4 ring-1 ring-inset ring-border placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
@@ -195,19 +195,18 @@ export function SchedulingForm() {
             
             <div className="space-y-1.5">
               <Label htmlFor="id-number" className="block text-sm font-bold pl-1">
-                ID Number
+                Identification Number
               </Label>
               <Input
                 id="id-number"
                 type="text"
-                placeholder="1234567890"
-                maxLength={10}
+                placeholder="e.g. 1234567890"
                 value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setIdNumber(e.target.value)}
                 className="rounded-2xl bg-muted border-0 py-6 px-4 ring-1 ring-inset ring-border placeholder:text-muted-foreground focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-muted-foreground pl-1">
-                National registration number, 10 digits (optional)
+                National ID, corporate number, or government code (optional)
               </p>
             </div>
           </div>

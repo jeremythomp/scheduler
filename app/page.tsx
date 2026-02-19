@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { OfficialBanner } from "@/components/landing/official-banner"
 import { Header } from "@/components/landing/header"
 import { Hero } from "@/components/landing/hero"
@@ -5,15 +6,14 @@ import { CalendarSection } from "@/components/landing/calendar-section"
 import { Footer } from "@/components/landing/footer"
 import { DayBlockNotice } from "@/components/landing/day-block-notice"
 
-// Force dynamic rendering for database-dependent components
-export const dynamic = 'force-dynamic'
-
 export default function Home() {
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
       <OfficialBanner />
       <Header />
-      <DayBlockNotice />
+      <Suspense fallback={null}>
+        <DayBlockNotice />
+      </Suspense>
       <main className="flex-1 flex flex-col">
         <Hero />
         <CalendarSection />

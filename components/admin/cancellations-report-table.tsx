@@ -28,6 +28,28 @@ const SERVICE_BADGE_CLASSES: Record<string, string> = {
   "Vehicle Registration/Customer Service Center": "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
 }
 
+function formatScheduledDate(value?: string): string {
+  if (!value) return "—"
+
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) {
+    return format(parsed, "MMM d, yyyy")
+  }
+
+  // Legacy cancellation snapshots store strings like:
+  // "Vehicle Inspection: 2/18/2026 at 08:30 AM"
+  const slashDateMatch = value.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/)
+  if (slashDateMatch) {
+    const legacyParsed = new Date(slashDateMatch[0])
+    if (!Number.isNaN(legacyParsed.getTime())) {
+      return format(legacyParsed, "MMM d, yyyy")
+    }
+    return slashDateMatch[0]
+  }
+
+  return value
+}
+
 export interface CancellationsReportTableProps {
   data: CancellationReportRow[]
   summary?: { today: number; thisWeek: number; thisMonth: number }
@@ -132,9 +154,7 @@ export function CancellationsReportTable({
                     </div>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-muted-foreground">
-                    {row.scheduledDates?.[0]
-                      ? format(new Date(row.scheduledDates[0]), "MMM d, yyyy")
-                      : "—"}
+                    {formatScheduledDate(row.scheduledDates?.[0])}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-muted-foreground">
                     {row.reason ?? "—"}
